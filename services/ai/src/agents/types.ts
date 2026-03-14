@@ -138,6 +138,51 @@ export interface CoverageAdviceReport {
   prioritizedFiles: string[];
 }
 
+// --- Checklist Generation ---
+
+export interface ChecklistGenInput extends AgentInput {
+  context: {
+    repoUrl?: string;
+    targetUrl?: string;
+    appDescription?: string;
+    existingFeatures?: string[];
+  };
+}
+
+export interface ChecklistGenState {
+  input: ChecklistGenInput;
+  analysis: string;
+  checklist: string;
+  validation: { valid: boolean; issues: string[] };
+  refinementCount: number;
+  finalOutput: string;
+  model: string;
+  tokensUsed: number;
+}
+
+export interface ChecklistTestGenInput extends AgentInput {
+  context: {
+    checklistItem: {
+      title: string;
+      description: string;
+      expectedBehavior: string;
+    };
+    targetUrl: string;
+    framework: string;
+  };
+}
+
+export interface ChecklistTestGenState {
+  input: ChecklistTestGenInput;
+  analysis: string;
+  generatedTest: string;
+  validationResult: { valid: boolean; issues: string[] };
+  refinementCount: number;
+  finalOutput: string;
+  model: string;
+  tokensUsed: number;
+}
+
 export interface CoverageRecommendation {
   filePath: string;
   priority: 'high' | 'medium' | 'low';
