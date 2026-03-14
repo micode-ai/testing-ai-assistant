@@ -64,6 +64,37 @@ Recommendations for improving code test coverage.
 3. Prioritizes by importance
 4. Suggests specific tests to write
 
+### 5. Checklist Generation
+
+AI-generated test checklists from application analysis.
+
+**How it works:**
+1. Provide a target URL, repository URL, or app description
+2. The AI agent analyzes the application's features and workflows
+3. Generates a comprehensive checklist of 10-25 test scenarios
+4. Each item includes title, description, expected behavior, and priority
+
+**When to use:**
+- Starting QA for a new application
+- Comprehensive regression test planning
+- Onboarding new QA team members to a project
+
+### 6. Checklist Test Generation
+
+AI-generated Playwright E2E tests from individual checklist items.
+
+**How it works:**
+1. Select a checklist item that describes a test scenario
+2. The AI agent analyzes the scenario and plans test steps
+3. Generates a complete Playwright test with accessible selectors
+4. Validates syntax and refines up to 3 times
+5. Returns ready-to-execute test code
+
+**When to use:**
+- Automating manual test checklists
+- Generating E2E tests for functional testing against a live app
+- Converting acceptance criteria into executable tests
+
 ## Usage
 
 ### Via Dashboard

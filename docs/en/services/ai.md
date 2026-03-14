@@ -4,7 +4,7 @@
 
 | Property | Value |
 |---|---|
-| **Purpose** | AI-powered test generation, bug detection, flaky test detection, and coverage advice |
+| **Purpose** | AI-powered test generation, bug detection, flaky test detection, coverage advice, checklist generation, and checklist test generation |
 | **Port** | 3005 |
 | **Database** | `ai_db` (PostgreSQL, port 5440) |
 | **Framework** | NestJS |
@@ -20,6 +20,8 @@ enum GenerationType {
   BUG_DETECT
   FLAKY_DETECT
   COVERAGE_ADVICE
+  CHECKLIST_GEN
+  CHECKLIST_TEST_GEN
 }
 
 model AIGeneration {
@@ -56,6 +58,8 @@ All endpoints require `Bearer JWT` authentication.
 | `BUG_DETECT` | Analyze test results and code diffs to detect bugs | o3 (advanced) |
 | `FLAKY_DETECT` | Identify flaky tests through statistical and pattern analysis | gpt-4.1-mini (fast) |
 | `COVERAGE_ADVICE` | Analyze coverage data and recommend improvements | gpt-4.1-mini (fast) |
+| `CHECKLIST_GEN` | Generate a test checklist from app description or URL | o3 (advanced) |
+| `CHECKLIST_TEST_GEN` | Generate Playwright E2E test code from a checklist item | o3 (advanced) |
 
 ## LangGraph Agent Architecture
 
@@ -156,6 +160,64 @@ flowchart TD
 
 **Model routing**: Uses the fast model (gpt-4.1-mini) for straightforward coverage analysis.
 
+### Checklist Generator Agent
+
+```mermaid
+flowchart TD
+    Start([Start]) --> AnalyzeApp
+    AnalyzeApp["analyzeApp<br/>Analyze target URL/repo/description,<br/>identify features and workflows"]
+    AnalyzeApp --> GenerateChecklist
+    GenerateChecklist["generateChecklist<br/>Generate JSON array of test items<br/>with title, description, expectedBehavior, priority"]
+    GenerateChecklist --> ValidateChecklist
+    ValidateChecklist["validateChecklist<br/>Check JSON validity, completeness,<br/>no duplicates, testable items"]
+    ValidateChecklist --> QualityGate{"Valid?"}
+    QualityGate -- No --> RefineChecklist
+    RefineChecklist["refineChecklist<br/>Fix JSON issues"]
+    RefineChecklist --> ValidateChecklist
+    QualityGate -- Yes --> FormatOutput
+    FormatOutput["formatOutput<br/>Clean JSON output"]
+    FormatOutput --> End([End])
+
+    style Start fill:#22c55e,color:#fff
+    style End fill:#22c55e,color:#fff
+    style QualityGate fill:#eab308,color:#000
+```
+
+**Input context**: Target URL, repository URL, app description, known features list.
+
+**Output**: JSON array of checklist items (10-25 items) with title, description, expected behavior, and priority.
+
+**Model routing**: Uses the advanced model (o3) for thorough feature analysis.
+
+### Checklist Test Generator Agent
+
+```mermaid
+flowchart TD
+    Start([Start]) --> AnalyzeItem
+    AnalyzeItem["analyzeItem<br/>Plan test steps, selectors,<br/>interactions, assertions"]
+    AnalyzeItem --> GenerateTest
+    GenerateTest["generateTest<br/>Generate Playwright test with<br/>accessible selectors, screenshots"]
+    GenerateTest --> ValidateTest
+    ValidateTest["validateTest<br/>Check syntax, imports,<br/>no hardcoded URLs"]
+    ValidateTest --> QualityGate{"Valid?"}
+    QualityGate -- No --> RefineTest
+    RefineTest["refineTest<br/>Fix Playwright API issues"]
+    RefineTest --> ValidateTest
+    QualityGate -- Yes --> FormatOutput
+    FormatOutput["formatOutput<br/>Strip markdown fences"]
+    FormatOutput --> End([End])
+
+    style Start fill:#22c55e,color:#fff
+    style End fill:#22c55e,color:#fff
+    style QualityGate fill:#eab308,color:#000
+```
+
+**Input context**: Checklist item (title, description, expectedBehavior), target URL, framework (playwright).
+
+**Output**: Complete Playwright test file using accessible selectors (`getByRole`, `getByLabel`, `getByText`), with screenshots at key points.
+
+**Model routing**: Uses the advanced model (o3) for accurate selector and assertion generation.
+
 ## Model Routing Strategy
 
 The service uses two OpenAI models with different characteristics:
@@ -167,6 +229,8 @@ flowchart LR
     Router -- "BUG_DETECT" --> Advanced
     Router -- "FLAKY_DETECT" --> Fast["gpt-4.1-mini<br/>(Fast Model)"]
     Router -- "COVERAGE_ADVICE" --> Fast
+    Router -- "CHECKLIST_GEN" --> Advanced
+    Router -- "CHECKLIST_TEST_GEN" --> Advanced
 
     style Advanced fill:#7c3aed,color:#fff
     style Fast fill:#2563eb,color:#fff
@@ -175,7 +239,7 @@ flowchart LR
 | Model | Variable | Use Cases | Characteristics |
 |---|---|---|---|
 | **gpt-4.1-mini** | `OPENAI_MODEL_FAST` | Flaky detection, coverage advice | Low latency, lower cost, sufficient for pattern matching |
-| **o3** | `OPENAI_MODEL_ADVANCED` | Test generation, bug detection | Deep reasoning, higher accuracy for code generation |
+| **o3** | `OPENAI_MODEL_ADVANCED` | Test generation, bug detection, checklist generation, checklist test generation | Deep reasoning, higher accuracy for code generation |
 
 ## Feedback Loop
 

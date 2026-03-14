@@ -9,7 +9,9 @@
 | **Orchestration** | Temporal Server (port 7233) |
 | **Artifact Storage** | MinIO (S3-compatible) |
 
-The Test Runner Service does not expose an HTTP API. Instead, it registers as a Temporal worker that executes the `testPipelineWorkflow` when triggered by the Pipeline Service.
+The Test Runner Service does not expose an HTTP API. Instead, it registers as a Temporal worker that executes workflows when triggered by the Pipeline Service:
+- `testPipelineWorkflow` — executes CI/CD pipeline steps (unit tests, linting, security, etc.)
+- `checklistRunWorkflow` — executes checklist items as Playwright E2E tests against a live application
 
 ## TestPipelineWorkflow
 
@@ -73,6 +75,43 @@ flowchart TD
     style Start fill:#22c55e,color:#fff
     style End fill:#22c55e,color:#fff
 ```
+
+## ChecklistRunWorkflow
+
+Executes checklist items as Playwright E2E tests against a target URL.
+
+```mermaid
+flowchart TD
+    Start([Workflow Start<br/>runId, targetUrl, items]) --> NotifyStart
+    NotifyStart["notifyChecklistRunStarted<br/>Mark run as RUNNING"]
+    NotifyStart --> Loop
+
+    subgraph Loop["For each checklist item"]
+        ReportRunning["reportChecklistItemResult<br/>status: RUNNING"]
+        ReportRunning --> WriteTest["Write test code to temp file<br/>+ playwright.config.ts"]
+        WriteTest --> InstallPW["Install Playwright chromium"]
+        InstallPW --> Execute["npx playwright test"]
+        Execute --> Collect["Collect screenshots + results"]
+        Collect --> ReportResult["reportChecklistItemResult<br/>status: PASSED / FAILED"]
+    end
+
+    Loop --> NotifyComplete["notifyChecklistRunCompleted"]
+    NotifyComplete --> End([End])
+
+    style Start fill:#22c55e,color:#fff
+    style End fill:#22c55e,color:#fff
+```
+
+### Checklist Activity Details
+
+| Activity | Timeout | Description |
+|---|---|---|
+| `notifyChecklistRunStarted` | 1 min | Marks run as RUNNING via Pipeline Service |
+| `reportChecklistItemResult` | 1 min | Reports item status (RUNNING/PASSED/FAILED) |
+| `runChecklistItemTest` | 5 min | Writes Playwright test to temp dir, installs browser, executes test, collects screenshots |
+| `notifyChecklistRunCompleted` | 1 min | Marks run as PASSED/FAILED/ERRORED |
+
+Each item test runs in an isolated temp directory with its own `playwright.config.ts` that sets `baseURL` to the target URL.
 
 ## Activity Groups
 

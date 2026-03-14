@@ -4,7 +4,7 @@
 
 | Property | Value |
 |---|---|
-| **Purpose** | Pipeline configuration, test run management, result tracking, coverage snapshots |
+| **Purpose** | Pipeline configuration, test run management, result tracking, coverage snapshots, checklist-based testing |
 | **Port** | 3004 |
 | **Database** | `pipeline_db` (PostgreSQL, port 5438) |
 | **Framework** | NestJS |
@@ -39,6 +39,15 @@ enum TestCheckType {
   DAST
   DEPENDENCY_AUDIT
   AI_REVIEW
+  REPOSITORY_SETUP
+  COVERAGE
+}
+
+enum ChecklistItemPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
 enum TestStatus {
@@ -92,6 +101,59 @@ model TestResult {
   coverage    CoverageSnapshot?
 }
 
+model Checklist {
+  id          String          @id @default(uuid())
+  projectId   String
+  name        String
+  description String          @default("")
+  targetUrl   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  items       ChecklistItem[]
+  runs        ChecklistRun[]
+}
+
+model ChecklistItem {
+  id                String                @id @default(uuid())
+  checklistId       String
+  title             String
+  description       String                @default("")
+  expectedBehavior  String                @default("")
+  priority          ChecklistItemPriority @default(MEDIUM)
+  order             Int                   @default(0)
+  generatedTestCode String?               @db.Text
+  checklist         Checklist             @relation(...)
+  results           ChecklistItemResult[]
+}
+
+model ChecklistRun {
+  id          String        @id @default(uuid())
+  checklistId String
+  targetUrl   String
+  status      TestRunStatus @default(QUEUED)
+  triggeredBy String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  metadata    Json          @default("{}")
+  createdAt   DateTime      @default(now())
+  checklist   Checklist     @relation(...)
+  itemResults ChecklistItemResult[]
+}
+
+model ChecklistItemResult {
+  id          String     @id @default(uuid())
+  runId       String
+  itemId      String
+  status      TestStatus @default(PENDING)
+  summary     String     @default("")
+  details     Json       @default("{}")
+  screenshots Json       @default("[]")
+  durationMs  Int        @default(0)
+  createdAt   DateTime   @default(now())
+  run         ChecklistRun   @relation(...)
+  item        ChecklistItem  @relation(...)
+}
+
 model CoverageSnapshot {
   id          String     @id @default(uuid())
   resultId    String     @unique
@@ -126,6 +188,44 @@ All endpoints require `Bearer JWT` authentication.
 | `GET` | `/test-runs?pipelineId=<id>` | Bearer JWT | List test runs for a pipeline |
 | `GET` | `/test-runs/:id` | Bearer JWT | Get test run with results |
 | `POST` | `/test-runs/:id/cancel` | Bearer JWT | Cancel a running test run |
+
+### Checklist Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/checklists` | Bearer JWT | Create a new checklist |
+| `GET` | `/checklists?projectId=<id>` | Bearer JWT | List checklists by project |
+| `GET` | `/checklists/:id` | Bearer JWT | Get checklist with items |
+| `PATCH` | `/checklists/:id` | Bearer JWT | Update checklist |
+| `DELETE` | `/checklists/:id` | Bearer JWT | Delete checklist |
+| `POST` | `/checklists/:id/items` | Bearer JWT | Add item to checklist |
+| `PATCH` | `/checklists/:id/items/:itemId` | Bearer JWT | Update checklist item |
+| `DELETE` | `/checklists/:id/items/:itemId` | Bearer JWT | Delete checklist item |
+| `POST` | `/checklists/:id/items/reorder` | Bearer JWT | Reorder checklist items |
+| `POST` | `/checklists/:id/export` | Bearer JWT | Export checklist as JSON |
+| `POST` | `/checklists/import` | Bearer JWT | Import checklist from JSON |
+| `POST` | `/checklists/:id/run` | Bearer JWT | Trigger checklist execution |
+| `GET` | `/checklist-runs/:runId` | Bearer JWT | Get checklist run with item results |
+
+### Checklist Import/Export Format
+
+```json
+{
+  "version": "1.0",
+  "name": "Login Flow Tests",
+  "description": "End-to-end tests for authentication",
+  "targetUrl": "https://myapp.example.com",
+  "items": [
+    {
+      "title": "User can login with valid credentials",
+      "description": "Enter email and password, click submit",
+      "expectedBehavior": "User is redirected to dashboard",
+      "priority": "CRITICAL",
+      "generatedTestCode": "import { test, expect } from '@playwright/test'; ..."
+    }
+  ]
+}
+```
 
 ## Pipeline Trigger Flow
 
@@ -261,3 +361,31 @@ The `steps` field on the Pipeline model is a JSON array defining which checks to
 | `sast` | Security | Static Application Security Testing |
 | `dast` | Security | Dynamic Application Security Testing |
 | `dep_audit` | Security | Dependency vulnerability audit |
+| `coverage` | Quality | Code coverage collection and reporting |
+| `repository_setup` | Setup | Repository clone and dependency install |
+
+## Checklist-Based Testing
+
+Checklists provide a structured way to define, generate, and execute test scenarios against a live application.
+
+### Workflow
+
+1. **Create Checklist** — manually add test items or AI-generate from app description/URL
+2. **Generate Tests** — AI generates Playwright E2E test code for each checklist item
+3. **Run Checklist** — execute all items against a target URL via Temporal workflow
+4. **Review Results** — each item shows PASSED/FAILED with screenshots and output
+
+### Execution Flow
+
+```mermaid
+flowchart TD
+    Create["Create Checklist<br/>(manual or AI-generated)"] --> Generate["Generate Playwright Tests<br/>(per item, via AI)"]
+    Generate --> Run["Trigger Run<br/>(provide target URL)"]
+    Run --> Temporal["Temporal: checklistRunWorkflow"]
+    Temporal --> Loop["For each item:"]
+    Loop --> Write["Write test to temp file"]
+    Write --> Execute["npx playwright test"]
+    Execute --> Report["Report result + screenshots"]
+    Report --> Loop
+    Loop --> Complete["Run completed<br/>(PASSED / FAILED)"]
+```

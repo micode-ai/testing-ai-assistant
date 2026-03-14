@@ -151,3 +151,75 @@ Test runs are orchestrated via Temporal:
 5. **Pipeline Service** updates status and results
 
 You can monitor workflows in **Temporal UI**: http://localhost:8233
+
+## Checklists
+
+Checklists provide a structured way to define, generate, and execute test scenarios against a live application.
+
+### Creating a Checklist
+
+1. Open project → **"Checklists"** in sidebar
+2. Click **"New Checklist"**
+3. Fill in name, description, and target URL
+4. Add test items (title, description, expected behavior, priority)
+5. Click **"Create Checklist"**
+
+### AI-Generated Checklists
+
+1. Open the AI page → select **"Checklist Generation"** type
+2. Provide app description or target URL
+3. AI generates 10-25 test scenarios
+4. Import the generated checklist
+
+### Generating Tests from Checklist Items
+
+1. Open a checklist
+2. Click **"Generate Test"** on any item → AI creates a Playwright test
+3. Or click **"Generate All Tests"** to generate for all items at once
+4. Review generated code in the expandable section under each item
+
+### Running a Checklist
+
+1. Enter the **Target URL** (the live app to test against)
+2. Click **"Run Checklist"**
+3. The system executes each item's Playwright test sequentially
+4. Results appear in real-time: RUNNING → PASSED / FAILED
+5. Each item shows duration, output log, and screenshots
+
+### Import / Export
+
+**Export**: Open checklist → click "Export" → saves as JSON file
+
+**Import**: Checklists page → "Import" → paste JSON or upload file
+
+JSON format:
+```json
+{
+  "version": "1.0",
+  "name": "My Checklist",
+  "items": [
+    {
+      "title": "Login with valid credentials",
+      "description": "...",
+      "expectedBehavior": "User sees dashboard",
+      "priority": "CRITICAL",
+      "generatedTestCode": "..."
+    }
+  ]
+}
+```
+
+### Checklist API
+
+```
+GET    /checklists?projectId=<id>            — List checklists
+POST   /checklists                            — Create checklist
+GET    /checklists/:id                        — Get with items
+PATCH  /checklists/:id                        — Update
+DELETE /checklists/:id                        — Delete
+POST   /checklists/:id/items                  — Add item
+POST   /checklists/:id/run                    — Trigger execution
+POST   /checklists/:id/export                 — Export JSON
+POST   /checklists/import                     — Import JSON
+GET    /checklist-runs/:runId                  — Get run results
+```
