@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GenerationType {
+  TEST_GEN
+  BUG_DETECT
+  FLAKY_DETECT
+  COVERAGE_ADVICE
+}
+
+model AIGeneration {
+  id            String   @id @default(uuid())
+  projectId     String   @map("project_id")
+  type          GenerationType
+  inputContext  Json     @map("input_context")
+  output        String   @db.Text
+  model         String
+  tokensUsed    Int      @default(0) @map("tokens_used")
+  accepted      Boolean?
+  feedback      String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@index([type])
+  @@map("ai_generations")
+}

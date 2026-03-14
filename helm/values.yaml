@@ -1,0 +1,40 @@
+## Global values shared across all sub-charts
+global:
+  ## Container image registry
+  imageRegistry: ""
+  ## Image pull secrets
+  imagePullSecrets: []
+  ## Application domain
+  domain: testing-ai.example.com
+  ## Environment name (dev, staging, production)
+  environment: dev
+  ## Storage class for persistent volumes
+  storageClass: ""
+
+## Sub-chart toggles and overrides
+identity:
+  enabled: true
+
+organization:
+  enabled: true
+
+project:
+  enabled: true
+
+pipeline:
+  enabled: true
+
+ai:
+  enabled: true
+
+notification:
+  enabled: true
+
+test-runner:
+  enabled: true
+
+dashboard:
+  enabled: true
+
+infrastructure:
+  enabled: false

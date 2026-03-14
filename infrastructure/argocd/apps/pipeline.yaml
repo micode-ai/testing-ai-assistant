@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: testing-ai-pipeline
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: testing-ai-assistant
+    app.kubernetes.io/component: pipeline
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: <REPO_URL>
+    targetRevision: HEAD
+    path: helm/charts/pipeline
+    helm:
+      valueFiles:
+        - ../../values/dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: testing-ai
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m

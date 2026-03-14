@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model NotificationConfig {
+  id        String              @id @default(uuid())
+  orgId     String              @map("org_id")
+  channel   NotificationChannel
+  event     String              // e.g. "run.finished", "membership.requested"
+  config    Json                @default("{}")  // channel-specific config (email addresses, slack channel, etc.)
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  logs      NotificationLog[]
+
+  @@unique([orgId, channel, event])
+  @@index([orgId])
+  @@map("notification_configs")
+}
+
+model NotificationLog {
+  id        String             @id @default(uuid())
+  configId  String             @map("config_id")
+  payload   Json
+  status    NotificationStatus @default(PENDING)
+  error     String?
+  sentAt    DateTime?          @map("sent_at")
+  createdAt DateTime           @default(now()) @map("created_at")
+  config    NotificationConfig @relation(fields: [configId], references: [id])
+
+  @@index([configId])
+  @@index([status])
+  @@map("notification_logs")
+}
+
+enum NotificationChannel {
+  EMAIL
+  SLACK
+  TELEGRAM
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}

@@ -1,0 +1,158 @@
+## Dev environment values
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  domain: dev.testing-ai.local
+  environment: dev
+
+identity:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    host: identity.dev.testing-ai.local
+
+organization:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    host: organization.dev.testing-ai.local
+
+project:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    host: project.dev.testing-ai.local
+
+pipeline:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    host: pipeline.dev.testing-ai.local
+
+ai:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    host: ai.dev.testing-ai.local
+
+notification:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    host: notification.dev.testing-ai.local
+
+test-runner:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+
+dashboard:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    host: dev.testing-ai.local
+  env:
+    NEXT_PUBLIC_API_URL: "http://api.dev.testing-ai.local"
+    NEXTAUTH_URL: "http://dev.testing-ai.local"

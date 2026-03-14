@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PipelineTrigger {
+  PUSH
+  PULL_REQUEST
+  SCHEDULE
+  MANUAL
+}
+
+enum TestRunStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  FAILED
+  ERRORED
+  CANCELLED
+}
+
+enum TestCheckType {
+  UNIT
+  INTEGRATION
+  E2E
+  LOAD
+  LINT
+  SAST
+  DAST
+  DEPENDENCY_AUDIT
+  AI_REVIEW
+  REPOSITORY_SETUP
+  COVERAGE
+}
+
+enum TestStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+model Pipeline {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  name      String
+  trigger   PipelineTrigger
+  cronExpr  String?  @map("cron_expr")
+  steps     Json     @default("[]")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  runs      TestRun[]
+
+  @@index([projectId])
+  @@map("pipelines")
+}
+
+model TestRun {
+  id          String        @id @default(uuid())
+  pipelineId  String        @map("pipeline_id")
+  commitSha   String        @map("commit_sha")
+  branch      String
+  status      TestRunStatus @default(QUEUED)
+  startedAt   DateTime?     @map("started_at")
+  finishedAt  DateTime?     @map("finished_at")
+  triggeredBy String?       @map("triggered_by")
+  metadata    Json          @default("{}")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  pipeline    Pipeline      @relation(fields: [pipelineId], references: [id])
+  results     TestResult[]
+
+  @@index([pipelineId])
+  @@index([status])
+  @@map("test_runs")
+}
+
+model TestResult {
+  id          String        @id @default(uuid())
+  runId       String        @map("run_id")
+  checkType   TestCheckType @map("check_type")
+  status      TestStatus    @default(PENDING)
+  summary     String        @default("")
+  details     Json          @default("{}")
+  artifactUrl String?       @map("artifact_url")
+  durationMs  Int           @default(0) @map("duration_ms")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  run         TestRun       @relation(fields: [runId], references: [id])
+  coverage    CoverageSnapshot?
+
+  @@index([runId])
+  @@map("test_results")
+}
+
+model CoverageSnapshot {
+  id          String     @id @default(uuid())
+  resultId    String     @unique @map("result_id")
+  linePct     Float      @map("line_pct")
+  branchPct   Float      @map("branch_pct")
+  functionPct Float      @map("function_pct")
+  uncovered   Json       @default("{}")
+  result      TestResult @relation(fields: [resultId], references: [id])
+
+  @@map("coverage_snapshots")
+}

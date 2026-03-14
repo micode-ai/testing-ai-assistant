@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OAuthProvider {
+  GITHUB
+  GITLAB
+  BITBUCKET
+}
+
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  email      String  @unique
+  name       String
+  passwordHash String? @map("password_hash")
+  avatarUrl  String? @map("avatar_url")
+  keycloakId String? @unique @map("keycloak_id")
+
+  oauthAccounts OAuthAccount[]
+  refreshTokens RefreshToken[]
+
+  @@index([deletedAt])
+  @@index([keycloakId])
+  @@map("users")
+}
+
+model OAuthAccount {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  provider       OAuthProvider
+  providerUserId String        @map("provider_user_id")
+  accessToken    String        @map("access_token")
+  refreshToken   String?       @map("refresh_token")
+  expiresAt      DateTime?     @map("expires_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}

@@ -1,0 +1,180 @@
+# ===========================================================================
+# Traefik Dynamic Configuration – Middlewares
+# ===========================================================================
+
+http:
+  middlewares:
+    # -----------------------------------------------------------------------
+    # Rate Limiting – General (100 req/s per IP)
+    # -----------------------------------------------------------------------
+    rate-limit-global:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+            excludedIPs:
+              - "127.0.0.1/32"
+              - "10.0.0.0/8"
+
+    # -----------------------------------------------------------------------
+    # Rate Limiting – Auth endpoints (20 req/s per IP)
+    # -----------------------------------------------------------------------
+    rate-limit-auth:
+      rateLimit:
+        average: 20
+        burst: 40
+        period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # -----------------------------------------------------------------------
+    # JWT Validation (forward auth to identity service)
+    # -----------------------------------------------------------------------
+    jwt-auth:
+      forwardAuth:
+        address: "http://identity-service:3001/auth/verify"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-User-Id"
+          - "X-User-Email"
+          - "X-User-Roles"
+          - "X-Org-Id"
+
+    # -----------------------------------------------------------------------
+    # CORS Headers
+    # -----------------------------------------------------------------------
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Request-Id
+          - X-Correlation-Id
+        accessControlAllowOriginList:
+          - "https://testing-ai.example.com"
+          - "https://staging.testing-ai.example.com"
+          - "https://dev.testing-ai.example.com"
+        accessControlMaxAge: 7200
+        accessControlAllowCredentials: true
+        addVaryHeader: true
+
+    # -----------------------------------------------------------------------
+    # Security Headers
+    # -----------------------------------------------------------------------
+    security-headers:
+      headers:
+        # HSTS
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+
+        # Prevent MIME-sniffing
+        contentTypeNosniff: true
+
+        # Clickjacking protection
+        frameDeny: true
+        customFrameOptionsValue: "SAMEORIGIN"
+
+        # XSS protection
+        browserXssFilter: true
+
+        # Content Security Policy
+        contentSecurityPolicy: >-
+          default-src 'self';
+          script-src 'self' 'unsafe-inline' 'unsafe-eval';
+          style-src 'self' 'unsafe-inline';
+          img-src 'self' data: https:;
+          font-src 'self' data:;
+          connect-src 'self' wss: https:;
+          frame-ancestors 'self';
+          base-uri 'self';
+          form-action 'self';
+
+        # Referrer policy
+        referrerPolicy: "strict-origin-when-cross-origin"
+
+        # Permissions policy
+        permissionsPolicy: >-
+          camera=(),
+          microphone=(),
+          geolocation=(),
+          payment=(),
+          usb=(),
+          magnetometer=(),
+          gyroscope=(),
+          accelerometer=()
+
+        # Remove server header
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+          X-Request-Id: ""
+
+    # -----------------------------------------------------------------------
+    # Compression (gzip)
+    # -----------------------------------------------------------------------
+    compression:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+        minResponseBodyBytes: 1024
+
+    # -----------------------------------------------------------------------
+    # Circuit Breaker
+    # -----------------------------------------------------------------------
+    circuit-breaker:
+      circuitBreaker:
+        expression: "LatencyAtQuantileMS(50.0) > 2000 || NetworkErrorRatio() > 0.10 || ResponseCodeRatio(500, 600, 0, 600) > 0.25"
+        checkPeriod: 10s
+        fallbackDuration: 30s
+        recoveryDuration: 60s
+
+    # -----------------------------------------------------------------------
+    # Strip /api prefix before forwarding to backends
+    # -----------------------------------------------------------------------
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api/identity"
+          - "/api/org"
+          - "/api/project"
+          - "/api/pipeline"
+          - "/api/ai"
+          - "/api/notifications"
+
+    # -----------------------------------------------------------------------
+    # Basic auth for Traefik dashboard (replace with proper auth in production)
+    # -----------------------------------------------------------------------
+    traefik-auth:
+      basicAuth:
+        users:
+          # admin / changeme (generate with: htpasswd -nB admin)
+          - "admin:$2y$10$YW5hZG1pbjpjaGFuZ2VtZQ"
+        removeHeader: true
+
+    # -----------------------------------------------------------------------
+    # Request size limit (10MB default, higher for file uploads)
+    # -----------------------------------------------------------------------
+    request-size-limit:
+      buffering:
+        maxRequestBodyBytes: 10485760
+        memRequestBodyBytes: 2097152
+
+    # -----------------------------------------------------------------------
+    # Retry on transient failures
+    # -----------------------------------------------------------------------
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: 100ms

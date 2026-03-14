@@ -1,0 +1,196 @@
+# ===========================================================================
+# Traefik Dynamic Configuration – Routes
+# ===========================================================================
+
+http:
+  routers:
+    # -----------------------------------------------------------------------
+    # Identity Service
+    # -----------------------------------------------------------------------
+    identity-service:
+      rule: "PathPrefix(`/api/identity`)"
+      entryPoints:
+        - websecure
+      service: identity-service
+      middlewares:
+        - rate-limit-auth
+        - strip-api-prefix
+        - cors-headers
+      tls:
+        certResolver: letsencrypt
+
+    # -----------------------------------------------------------------------
+    # Organization Service
+    # -----------------------------------------------------------------------
+    organization-service:
+      rule: "PathPrefix(`/api/org`)"
+      entryPoints:
+        - websecure
+      service: organization-service
+      middlewares:
+        - rate-limit-global
+        - jwt-auth
+        - strip-api-prefix
+        - cors-headers
+      tls:
+        certResolver: letsencrypt
+
+    # -----------------------------------------------------------------------
+    # Project Service
+    # -----------------------------------------------------------------------
+    project-service:
+      rule: "PathPrefix(`/api/project`)"
+      entryPoints:
+        - websecure
+      service: project-service
+      middlewares:
+        - rate-limit-global
+        - jwt-auth
+        - strip-api-prefix
+        - cors-headers
+      tls:
+        certResolver: letsencrypt
+
+    # -----------------------------------------------------------------------
+    # Pipeline Service
+    # -----------------------------------------------------------------------
+    pipeline-service:
+      rule: "PathPrefix(`/api/pipeline`)"
+      entryPoints:
+        - websecure
+      service: pipeline-service
+      middlewares:
+        - rate-limit-global
+        - jwt-auth
+        - strip-api-prefix
+        - cors-headers
+      tls:
+        certResolver: letsencrypt
+
+    # -----------------------------------------------------------------------
+    # AI Service
+    # -----------------------------------------------------------------------
+    ai-service:
+      rule: "PathPrefix(`/api/ai`)"
+      entryPoints:
+        - websecure
+      service: ai-service
+      middlewares:
+        - rate-limit-global
+        - jwt-auth
+        - strip-api-prefix
+        - cors-headers
+      tls:
+        certResolver: letsencrypt
+
+    # -----------------------------------------------------------------------
+    # Notification Service
+    # -----------------------------------------------------------------------
+    notification-service:
+      rule: "PathPrefix(`/api/notifications`)"
+      entryPoints:
+        - websecure
+      service: notification-service
+      middlewares:
+        - rate-limit-global
+        - jwt-auth
+        - strip-api-prefix
+        - cors-headers
+      tls:
+        certResolver: letsencrypt
+
+    # -----------------------------------------------------------------------
+    # Dashboard (SPA – catch-all)
+    # -----------------------------------------------------------------------
+    dashboard:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - websecure
+      service: dashboard
+      middlewares:
+        - rate-limit-global
+        - cors-headers
+        - compression
+      tls:
+        certResolver: letsencrypt
+      priority: 1
+
+    # -----------------------------------------------------------------------
+    # Traefik API Dashboard (internal only)
+    # -----------------------------------------------------------------------
+    traefik-dashboard:
+      rule: "Host(`traefik.internal.testing-ai.example.com`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      entryPoints:
+        - websecure
+      service: api@internal
+      middlewares:
+        - traefik-auth
+      tls:
+        certResolver: letsencrypt
+
+  # -------------------------------------------------------------------------
+  # Services (upstream backends)
+  # -------------------------------------------------------------------------
+  services:
+    identity-service:
+      loadBalancer:
+        servers:
+          - url: "http://identity-service:3001"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+    organization-service:
+      loadBalancer:
+        servers:
+          - url: "http://organization-service:3002"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+    project-service:
+      loadBalancer:
+        servers:
+          - url: "http://project-service:3003"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+    pipeline-service:
+      loadBalancer:
+        servers:
+          - url: "http://pipeline-service:3004"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+    ai-service:
+      loadBalancer:
+        servers:
+          - url: "http://ai-service:3005"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+    notification-service:
+      loadBalancer:
+        servers:
+          - url: "http://notification-service:3006"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+    dashboard:
+      loadBalancer:
+        servers:
+          - url: "http://dashboard:4200"
+        healthCheck:
+          path: /
+          interval: 15s
+          timeout: 5s
