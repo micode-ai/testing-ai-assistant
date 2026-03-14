@@ -16,3 +16,9 @@ export { runPlaywrightTests } from './e2e.activities';
 export { collectCoverage, compareCoverage } from './coverage.activities';
 export { runK6LoadTest } from './load-test.activities';
 export { uploadArtifact, uploadDirectory } from './artifact.activities';
+export {
+  notifyChecklistRunStarted,
+  notifyChecklistRunCompleted,
+  reportChecklistItemResult,
+  runChecklistItemTest,
+} from './checklist.activities';

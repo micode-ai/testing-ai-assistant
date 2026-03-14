@@ -99,6 +99,82 @@ model TestResult {
   @@map("test_results")
 }
 
+enum ChecklistItemPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Checklist {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  name        String
+  description String   @default("")
+  targetUrl   String?  @map("target_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  items       ChecklistItem[]
+  runs        ChecklistRun[]
+
+  @@index([projectId])
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id                String                @id @default(uuid())
+  checklistId       String                @map("checklist_id")
+  title             String
+  description       String                @default("")
+  expectedBehavior  String                @default("") @map("expected_behavior")
+  priority          ChecklistItemPriority @default(MEDIUM)
+  order             Int                   @default(0)
+  generatedTestCode String?               @map("generated_test_code") @db.Text
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  checklist         Checklist             @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  results           ChecklistItemResult[]
+
+  @@index([checklistId])
+  @@map("checklist_items")
+}
+
+model ChecklistRun {
+  id          String        @id @default(uuid())
+  checklistId String        @map("checklist_id")
+  targetUrl   String        @map("target_url")
+  status      TestRunStatus @default(QUEUED)
+  triggeredBy String?       @map("triggered_by")
+  startedAt   DateTime?     @map("started_at")
+  finishedAt  DateTime?     @map("finished_at")
+  metadata    Json          @default("{}")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  checklist   Checklist     @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  itemResults ChecklistItemResult[]
+
+  @@index([checklistId])
+  @@index([status])
+  @@map("checklist_runs")
+}
+
+model ChecklistItemResult {
+  id          String     @id @default(uuid())
+  runId       String     @map("run_id")
+  itemId      String     @map("item_id")
+  status      TestStatus @default(PENDING)
+  summary     String     @default("")
+  details     Json       @default("{}")
+  screenshots Json       @default("[]")
+  durationMs  Int        @default(0) @map("duration_ms")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  run         ChecklistRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  item        ChecklistItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([itemId])
+  @@map("checklist_item_results")
+}
+
 model CoverageSnapshot {
   id          String     @id @default(uuid())
   resultId    String     @unique @map("result_id")

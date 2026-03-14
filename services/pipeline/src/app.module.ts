@@ -10,6 +10,7 @@ import { PipelineModule } from './pipeline/pipeline.module';
 import { TestRunModule } from './test-run/test-run.module';
 import { TestResultModule } from './test-result/test-result.module';
 import { SseModule } from './sse/sse.module';
+import { ChecklistModule } from './checklist/checklist.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 
 @Module({
@@ -31,6 +32,7 @@ import { JwtStrategy } from './common/strategies/jwt.strategy';
     TestRunModule,
     TestResultModule,
     SseModule,
+    ChecklistModule,
   ],
   providers: [JwtStrategy],
 })
