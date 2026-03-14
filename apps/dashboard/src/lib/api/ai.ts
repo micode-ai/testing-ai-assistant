@@ -56,7 +56,7 @@ export async function triggerGeneration(data: {
   type: GenerationType;
   inputContext: Record<string, unknown>;
 }): Promise<AIGeneration> {
-  return aiClient<AIGeneration>('/generations', {
+  return aiClient<AIGeneration>('/ai/generate', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -70,11 +70,11 @@ export async function getGenerations(
   if (type) {
     params.set('type', type);
   }
-  return aiClient<AIGeneration[]>(`/generations?${params.toString()}`);
+  return aiClient<AIGeneration[]>(`/ai/generations?${params.toString()}`);
 }
 
 export async function getGeneration(id: string): Promise<AIGeneration> {
-  return aiClient<AIGeneration>(`/generations/${id}`);
+  return aiClient<AIGeneration>(`/ai/generations/${id}`);
 }
 
 export async function submitFeedback(
@@ -82,12 +82,12 @@ export async function submitFeedback(
   accepted: boolean,
   feedback?: string,
 ): Promise<void> {
-  return aiClient<void>(`/generations/${id}/feedback`, {
+  return aiClient<void>(`/ai/generations/${id}/feedback`, {
     method: 'POST',
     body: JSON.stringify({ accepted, feedback }),
   });
 }
 
 export async function getGenerationStats(projectId: string): Promise<GenerationStats> {
-  return aiClient<GenerationStats>(`/generations/stats?projectId=${projectId}`);
+  return aiClient<GenerationStats>(`/ai/generations/stats?projectId=${projectId}`);
 }
