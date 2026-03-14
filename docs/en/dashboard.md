@@ -98,6 +98,11 @@ flowchart TD
 
         Coverage["/projects/[projectId]/coverage"]
 
+        ChecklistList["/projects/[projectId]/checklists"]
+        ChecklistNew["/projects/[projectId]/checklists/new"]
+        ChecklistDetail["/projects/[projectId]/checklists/[checklistId]"]
+        ChecklistRunDetail["/checklist-runs/[runId]"]
+
         AIList["/projects/[projectId]/ai"]
         AIGenerate["/projects/[projectId]/ai/generate"]
         AIDetail["/projects/[projectId]/ai/[generationId]"]

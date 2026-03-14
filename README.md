@@ -6,6 +6,13 @@
 
 **Testing AI Assistant** is an AI-powered test orchestration platform built on a microservices architecture. It automates test execution pipelines, generates tests using LLM agents, detects flaky tests and bugs, and delivers real-time notifications across multiple channels — all managed through a web dashboard and mobile app.
 
+**Key capabilities:**
+- Run existing tests from repositories (unit, lint, SAST, E2E, load, coverage)
+- AI-generated test checklists from app description or URL
+- AI-generated Playwright E2E tests from checklist items
+- Execute tests against a live application with real-time results
+- Import/export test checklists as JSON
+
 ## Technology Stack
 
 | Layer | Technology |
