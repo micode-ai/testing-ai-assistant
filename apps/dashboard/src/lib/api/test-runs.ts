@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth/auth';
+import { AuthExpiredError } from '@/lib/api/client';
 import { TestRun } from '@/types';
 
 const PIPELINE_API_URL = process.env.NEXT_PUBLIC_PIPELINE_API_URL || 'http://localhost:3004';
@@ -29,6 +30,10 @@ async function runClient<T>(path: string, options: RequestInit & { token?: strin
     ...fetchOptions,
     headers,
   });
+
+  if (response.status === 401) {
+    throw new AuthExpiredError();
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));

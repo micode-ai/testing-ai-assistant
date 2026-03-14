@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth/auth';
+import { AuthExpiredError } from '@/lib/api/client';
 import type { AIGeneration, GenerationStats, GenerationType } from '@/types';
 
 const AI_API_URL = process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:3005';
@@ -33,6 +34,10 @@ async function aiClient<T>(path: string, options: FetchOptions = {}): Promise<T>
     ...fetchOptions,
     headers,
   });
+
+  if (response.status === 401) {
+    throw new AuthExpiredError();
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));

@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth/auth';
+import { AuthExpiredError } from '@/lib/api/client';
 
 const PIPELINE_API_URL = process.env.NEXT_PUBLIC_PIPELINE_API_URL || 'http://localhost:3004';
 
@@ -25,6 +26,10 @@ async function checklistClient<T>(path: string, options: RequestInit & { token?:
   }
 
   const response = await fetch(`${PIPELINE_API_URL}${path}`, { ...fetchOptions, headers });
+
+  if (response.status === 401) {
+    throw new AuthExpiredError();
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
