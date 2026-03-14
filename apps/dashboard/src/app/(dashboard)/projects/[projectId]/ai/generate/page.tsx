@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Sparkles, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,8 +21,10 @@ import type { AIGeneration, GenerationType } from '@/types';
 
 export default function GeneratePage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const { data: session } = useSession();
   const searchParams = useSearchParams();
   const t = useTranslations();
+  const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
   const initialType = (searchParams.get('type') as GenerationType) || 'TEST_GEN';
 
   const generationTypes: { value: GenerationType; label: string }[] = [
@@ -77,7 +80,7 @@ export default function GeneratePage() {
         projectId,
         type,
         inputContext: buildInputContext(),
-      });
+      }, token);
       setResult(generation);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
@@ -91,7 +94,7 @@ export default function GeneratePage() {
     setSubmittingFeedback(true);
 
     try {
-      await submitFeedback(result.id, accepted, feedbackText || undefined);
+      await submitFeedback(result.id, accepted, feedbackText || undefined, token);
       setFeedbackSubmitted(true);
       setResult({ ...result, accepted, feedback: feedbackText || null });
     } catch (err) {

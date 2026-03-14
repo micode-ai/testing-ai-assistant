@@ -55,39 +55,43 @@ export async function triggerGeneration(data: {
   projectId: string;
   type: GenerationType;
   inputContext: Record<string, unknown>;
-}): Promise<AIGeneration> {
+}, token?: string): Promise<AIGeneration> {
   return aiClient<AIGeneration>('/ai/generate', {
     method: 'POST',
     body: JSON.stringify(data),
+    token,
   });
 }
 
 export async function getGenerations(
   projectId: string,
   type?: GenerationType,
+  token?: string,
 ): Promise<AIGeneration[]> {
   const params = new URLSearchParams({ projectId });
   if (type) {
     params.set('type', type);
   }
-  return aiClient<AIGeneration[]>(`/ai/generations?${params.toString()}`);
+  return aiClient<AIGeneration[]>(`/ai/generations?${params.toString()}`, { token });
 }
 
-export async function getGeneration(id: string): Promise<AIGeneration> {
-  return aiClient<AIGeneration>(`/ai/generations/${id}`);
+export async function getGeneration(id: string, token?: string): Promise<AIGeneration> {
+  return aiClient<AIGeneration>(`/ai/generations/${id}`, { token });
 }
 
 export async function submitFeedback(
   id: string,
   accepted: boolean,
   feedback?: string,
+  token?: string,
 ): Promise<void> {
   return aiClient<void>(`/ai/generations/${id}/feedback`, {
     method: 'POST',
     body: JSON.stringify({ accepted, feedback }),
+    token,
   });
 }
 
-export async function getGenerationStats(projectId: string): Promise<GenerationStats> {
-  return aiClient<GenerationStats>(`/ai/generations/stats?projectId=${projectId}`);
+export async function getGenerationStats(projectId: string, token?: string): Promise<GenerationStats> {
+  return aiClient<GenerationStats>(`/ai/generations/stats?projectId=${projectId}`, { token });
 }

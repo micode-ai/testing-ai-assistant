@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Check, X, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,9 @@ export default function GenerationDetailPage() {
     projectId: string;
     generationId: string;
   }>();
+  const { data: session } = useSession();
   const t = useTranslations();
+  const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
 
   const [generation, setGeneration] = useState<AIGeneration | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,9 +36,10 @@ export default function GenerationDetailPage() {
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   useEffect(() => {
+    if (!token) return;
     async function load() {
       try {
-        const data = await getGeneration(generationId);
+        const data = await getGeneration(generationId, token);
         setGeneration(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load generation');
@@ -44,14 +48,14 @@ export default function GenerationDetailPage() {
       }
     }
     load();
-  }, [generationId]);
+  }, [generationId, token]);
 
   async function handleFeedback(accepted: boolean) {
     if (!generation) return;
     setSubmittingFeedback(true);
 
     try {
-      await submitFeedback(generation.id, accepted, feedbackText || undefined);
+      await submitFeedback(generation.id, accepted, feedbackText || undefined, token);
       setGeneration({ ...generation, accepted, feedback: feedbackText || null });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit feedback');

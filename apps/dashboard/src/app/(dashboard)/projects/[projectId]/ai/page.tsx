@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { Sparkles, TestTube, Bug, RotateCcw, ShieldCheck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,18 +22,22 @@ import type { AIGeneration, GenerationStats } from '@/types';
 
 export default function AIHubPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const { data: session } = useSession();
   const t = useTranslations();
   const [stats, setStats] = useState<GenerationStats | null>(null);
   const [generations, setGenerations] = useState<AIGeneration[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
+
   useEffect(() => {
+    if (!token) return;
     async function load() {
       try {
         const [statsData, generationsData] = await Promise.all([
-          getGenerationStats(projectId),
-          getGenerations(projectId),
+          getGenerationStats(projectId, token),
+          getGenerations(projectId, undefined, token),
         ]);
         setStats(statsData);
         setGenerations(generationsData);
@@ -43,7 +48,7 @@ export default function AIHubPage() {
       }
     }
     load();
-  }, [projectId, t]);
+  }, [projectId, token, t]);
 
   if (loading) {
     return (
