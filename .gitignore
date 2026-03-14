@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Prisma generated client (regenerated via prisma generate)
+services/*/generated/
+
+# Prisma SQLite (local dev)
+prisma/*.db
+prisma/*.db-journal
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Docker volumes (local)
+.docker-data/
+docker-compose.override.yml
+
+# MinIO
+.minio-data/
+
+# Expo / React Native
+.expo/
+ios/
+android/
+
+# Helm
+helm/**/charts/
+helm/**/*.tgz
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
+.cache/
+.claude

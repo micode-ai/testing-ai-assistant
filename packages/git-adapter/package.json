@@ -1,0 +1,24 @@
+{
+  "name": "@testing-ai/git-adapter",
+  "version": "0.0.1",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0",
+    "@gitbeaker/rest": "^40.0.0",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node-fetch": "^2.6.11",
+    "typescript": "^5.6.0"
+  },
+  "peerDependencies": {
+    "@testing-ai/shared-types": "workspace:*"
+  }
+}

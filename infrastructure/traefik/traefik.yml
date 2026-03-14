@@ -1,0 +1,120 @@
+# ===========================================================================
+# Traefik Static Configuration
+# ===========================================================================
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# ---------------------------------------------------------------------------
+# Entry Points
+# ---------------------------------------------------------------------------
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - security-headers@file
+        - rate-limit-global@file
+        - compression@file
+
+  metrics:
+    address: ":8082"
+
+# ---------------------------------------------------------------------------
+# Certificate Resolvers (Let's Encrypt)
+# ---------------------------------------------------------------------------
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: devops@testing-ai.example.com
+      storage: /etc/traefik/acme/acme.json
+      caServer: https://acme-v02.api.letsencrypt.org/directory
+      tlsChallenge: {}
+      # For DNS challenge (preferred for wildcard certs):
+      # dnsChallenge:
+      #   provider: route53
+      #   delayBeforeCheck: 30
+      #   resolvers:
+      #     - "1.1.1.1:53"
+      #     - "8.8.8.8:53"
+
+# ---------------------------------------------------------------------------
+# API / Dashboard
+# ---------------------------------------------------------------------------
+api:
+  dashboard: true
+  insecure: false
+
+# ---------------------------------------------------------------------------
+# Providers
+# ---------------------------------------------------------------------------
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+  # If running on Kubernetes, use the Kubernetes CRD provider instead:
+  # kubernetesCRD:
+  #   allowCrossNamespace: false
+  #   namespaces:
+  #     - testing-ai
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
+  filters:
+    statusCodes:
+      - "400-599"
+    retryAttempts: true
+    minDuration: "250ms"
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+        X-Request-Id: keep
+        X-Forwarded-For: keep
+
+# ---------------------------------------------------------------------------
+# Metrics (Prometheus)
+# ---------------------------------------------------------------------------
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    buckets:
+      - 0.01
+      - 0.05
+      - 0.1
+      - 0.25
+      - 0.5
+      - 1.0
+      - 2.5
+      - 5.0
+      - 10.0
+
+# ---------------------------------------------------------------------------
+# Health Checks
+# ---------------------------------------------------------------------------
+ping:
+  entryPoint: websecure

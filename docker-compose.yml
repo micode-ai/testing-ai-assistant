@@ -1,0 +1,344 @@
+services:
+  pg-identity:
+    image: postgres:16-alpine
+    ports:
+      - '5441:5432'
+    environment:
+      POSTGRES_DB: identity_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-identity-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  pg-org:
+    image: postgres:16-alpine
+    ports:
+      - '5434:5432'
+    environment:
+      POSTGRES_DB: org_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-org-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  pg-project:
+    image: postgres:16-alpine
+    ports:
+      - '5437:5432'
+    environment:
+      POSTGRES_DB: project_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-project-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  pg-pipeline:
+    image: postgres:16-alpine
+    ports:
+      - '5438:5432'
+    environment:
+      POSTGRES_DB: pipeline_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-pipeline-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  pg-notify:
+    image: postgres:16-alpine
+    ports:
+      - '5439:5432'
+    environment:
+      POSTGRES_DB: notify_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-notify-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  pg-ai:
+    image: postgres:16-alpine
+    ports:
+      - '5440:5432'
+    environment:
+      POSTGRES_DB: ai_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-ai-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  pg-keycloak:
+    image: postgres:16-alpine
+    ports:
+      - '5435:5432'
+    environment:
+      POSTGRES_DB: keycloak_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-keycloak-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  pg-temporal:
+    image: postgres:16-alpine
+    ports:
+      - '5442:5432'
+    environment:
+      POSTGRES_DB: temporal_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg-temporal-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6380:6379'
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  redpanda:
+    image: redpandadata/redpanda:v24.1.1
+    command:
+      - redpanda
+      - start
+      - --smp
+      - '1'
+      - --memory
+      - 512M
+      - --overprovisioned
+      - --kafka-addr
+      - internal://0.0.0.0:29092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:29092,external://localhost:19092
+      - --schema-registry-addr
+      - 0.0.0.0:18081
+    ports:
+      - '19092:19092'
+      - '18081:18081'
+      - '19644:9644'
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    networks:
+      - testing-ai-network
+
+  redpanda-console:
+    image: redpandadata/console:v2.4.5
+    ports:
+      - '18080:8080'
+    environment:
+      KAFKA_BROKERS: redpanda:29092
+    depends_on:
+      - redpanda
+    networks:
+      - testing-ai-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev
+    ports:
+      - '8180:8080'
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://pg-keycloak:5432/keycloak_db
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+    depends_on:
+      pg-keycloak:
+        condition: service_healthy
+    networks:
+      - testing-ai-network
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - '19000:9000'
+      - '19001:9001'
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testing-ai-network
+
+  temporal:
+    image: temporalio/auto-setup:1.24
+    ports:
+      - '7233:7233'
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_SEEDS=pg-temporal
+    depends_on:
+      pg-temporal:
+        condition: service_healthy
+    networks:
+      - testing-ai-network
+
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    ports:
+      - '8233:8080'
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+    networks:
+      - testing-ai-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ["--config=/etc/otel-collector-config.yml"]
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+      - '8889:8889'
+    volumes:
+      - ./infrastructure/observability/otel-collector/otel-collector-config.yml:/etc/otel-collector-config.yml
+    networks:
+      - testing-ai-network
+
+  loki:
+    image: grafana/loki:2.9.4
+    ports:
+      - '3100:3100'
+    volumes:
+      - ./infrastructure/observability/loki/loki-config.yml:/etc/loki/loki-config.yml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/loki-config.yml
+    networks:
+      - testing-ai-network
+
+  tempo:
+    image: grafana/tempo:2.3.1
+    ports:
+      - '3200:3200'
+      - '14268:14268'
+    volumes:
+      - ./infrastructure/observability/tempo/tempo-config.yml:/etc/tempo/tempo-config.yml
+      - tempo-data:/tmp/tempo
+    command: ["-config.file=/etc/tempo/tempo-config.yml"]
+    networks:
+      - testing-ai-network
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./infrastructure/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - testing-ai-network
+
+  grafana:
+    image: grafana/grafana:10.3.3
+    ports:
+      - '3300:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+    networks:
+      - testing-ai-network
+
+volumes:
+  pg-identity-data:
+  pg-org-data:
+  pg-project-data:
+  pg-pipeline-data:
+  pg-notify-data:
+  pg-ai-data:
+  pg-keycloak-data:
+  pg-temporal-data:
+  redis-data:
+  redpanda-data:
+  minio-data:
+  loki-data:
+  tempo-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  testing-ai-network:
+    driver: bridge

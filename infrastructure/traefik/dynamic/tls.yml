@@ -1,0 +1,55 @@
+# ===========================================================================
+# Traefik Dynamic Configuration – TLS
+# ===========================================================================
+
+tls:
+  options:
+    # -----------------------------------------------------------------------
+    # Default TLS options (applied to all HTTPS entrypoints)
+    # -----------------------------------------------------------------------
+    default:
+      minVersion: VersionTLS12
+      maxVersion: VersionTLS13
+      cipherSuites:
+        # TLS 1.3 cipher suites (always preferred when available)
+        - TLS_AES_256_GCM_SHA384
+        - TLS_AES_128_GCM_SHA256
+        - TLS_CHACHA20_POLY1305_SHA256
+        # TLS 1.2 cipher suites (AEAD only)
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      curvePreferences:
+        - X25519
+        - CurveP384
+        - CurveP256
+      sniStrict: true
+
+    # -----------------------------------------------------------------------
+    # Strict TLS 1.3 only (for internal services)
+    # -----------------------------------------------------------------------
+    strict:
+      minVersion: VersionTLS13
+      maxVersion: VersionTLS13
+      sniStrict: true
+
+  # -------------------------------------------------------------------------
+  # Certificates (if not using ACME / Let's Encrypt)
+  # -------------------------------------------------------------------------
+  # certificates:
+  #   - certFile: /etc/traefik/certs/testing-ai.example.com.crt
+  #     keyFile: /etc/traefik/certs/testing-ai.example.com.key
+  #     stores:
+  #       - default
+
+  stores:
+    default:
+      defaultGeneratedCert:
+        resolver: letsencrypt
+        domain:
+          main: "testing-ai.example.com"
+          sans:
+            - "*.testing-ai.example.com"

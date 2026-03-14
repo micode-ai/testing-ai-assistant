@@ -1,0 +1,180 @@
+## Staging environment values
+global:
+  imageRegistry: "registry.example.com/"
+  imagePullSecrets:
+    - name: registry-credentials
+  domain: staging.testing-ai.example.com
+  environment: staging
+
+identity:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    host: identity.staging.testing-ai.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+
+organization:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    host: organization.staging.testing-ai.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+
+project:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    host: project.staging.testing-ai.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+
+pipeline:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    host: pipeline.staging.testing-ai.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+
+ai:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    host: ai.staging.testing-ai.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+
+notification:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    host: notification.staging.testing-ai.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+
+test-runner:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: false
+
+dashboard:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "staging"
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    host: staging.testing-ai.example.com
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+  env:
+    NEXT_PUBLIC_API_URL: "https://api.staging.testing-ai.example.com"
+    NEXTAUTH_URL: "https://staging.testing-ai.example.com"

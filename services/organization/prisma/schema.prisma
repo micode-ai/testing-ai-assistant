@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrgPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum OrgMemberRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum OrgMemberStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  name String
+  slug String @unique
+  plan OrgPlan @default(FREE)
+
+  memberships OrgMembership[]
+
+  @@index([deletedAt])
+  @@index([slug])
+  @@map("organizations")
+}
+
+model OrgMembership {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  userId      String          @map("user_id")
+  role        OrgMemberRole   @default(MEMBER)
+  status      OrgMemberStatus @default(PENDING)
+  requestedAt DateTime        @default(now()) @map("requested_at")
+  resolvedAt  DateTime?       @map("resolved_at")
+
+  orgId        String       @map("org_id")
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("org_memberships")
+}
