@@ -2,6 +2,19 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client, Connection } from '@temporalio/client';
 
+export interface ChecklistRunInput {
+  runId: string;
+  checklistId: string;
+  targetUrl: string;
+  items: {
+    id: string;
+    title: string;
+    description: string;
+    expectedBehavior: string;
+    testCode: string | null;
+  }[];
+}
+
 export interface PipelineInput {
   runId: string;
   pipelineId: string;
@@ -49,6 +62,20 @@ export class TemporalService implements OnModuleDestroy {
     });
 
     this.logger.log(`Started workflow ${handle.workflowId} for run ${input.runId}`);
+    return handle.workflowId;
+  }
+
+  async startChecklistRun(input: ChecklistRunInput): Promise<string> {
+    const client = await this.getClient();
+
+    const handle = await client.workflow.start('checklistRunWorkflow', {
+      args: [input],
+      taskQueue: this.taskQueue,
+      workflowId: `checklist-run-${input.runId}`,
+      workflowExecutionTimeout: '1 hour',
+    });
+
+    this.logger.log(`Started checklist workflow ${handle.workflowId} for run ${input.runId}`);
     return handle.workflowId;
   }
 
