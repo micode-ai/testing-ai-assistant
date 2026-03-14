@@ -151,3 +151,56 @@ Przebiegi testowe są orkiestrowane przez Temporal:
 5. **Pipeline Service** aktualizuje status i wyniki
 
 Możesz monitorować workflows w **Temporal UI**: http://localhost:8233
+
+## Checklisty
+
+Checklisty umożliwiają definiowanie, generowanie i wykonywanie scenariuszy testowych na działającej aplikacji.
+
+### Tworzenie checklisty
+
+1. Otwórz projekt → **"Checklists"** w menu bocznym
+2. Kliknij **"New Checklist"**
+3. Podaj nazwę, opis i URL docelowej aplikacji
+4. Dodaj elementy testowe (tytuł, opis, oczekiwane zachowanie, priorytet)
+5. Kliknij **"Create Checklist"**
+
+### Checklisty generowane przez AI
+
+1. Otwórz stronę AI → wybierz typ **"Checklist Generation"**
+2. Podaj opis aplikacji lub URL
+3. AI wygeneruje 10-25 scenariuszy testowych
+4. Zaimportuj wygenerowaną checklistę
+
+### Generowanie testów z elementów
+
+1. Otwórz checklistę
+2. Kliknij **"Generate Test"** przy dowolnym elemencie → AI utworzy test Playwright
+3. Lub kliknij **"Generate All Tests"** aby wygenerować testy dla wszystkich elementów
+4. Przejrzyj kod testu w rozwijanej sekcji pod każdym elementem
+
+### Uruchamianie checklisty
+
+1. Wprowadź **Target URL** (URL działającej aplikacji)
+2. Kliknij **"Run Checklist"**
+3. System sekwencyjnie wykonuje test Playwright dla każdego elementu
+4. Wyniki pojawiają się w czasie rzeczywistym: RUNNING → PASSED / FAILED
+5. Każdy element pokazuje czas trwania, log wyjścia i zrzuty ekranu
+
+### Import / Eksport
+
+**Eksport**: Otwórz checklistę → "Export" → zapisuje jako JSON
+
+**Import**: Strona checklist → "Import" → wklej JSON
+
+### API checklist
+
+```
+GET    /checklists?projectId=<id>            — Lista checklist
+POST   /checklists                            — Tworzenie
+GET    /checklists/:id                        — Pobranie z elementami
+POST   /checklists/:id/items                  — Dodanie elementu
+POST   /checklists/:id/run                    — Uruchomienie wykonania
+POST   /checklists/:id/export                 — Eksport JSON
+POST   /checklists/import                     — Import JSON
+GET    /checklist-runs/:runId                  — Wyniki wykonania
+```

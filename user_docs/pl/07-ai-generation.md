@@ -64,6 +64,37 @@ Rekomendacje dotyczące poprawy pokrycia kodu testami.
 3. Priorytetyzuje według ważności
 4. Proponuje konkretne testy do napisania
 
+### 5. Generowanie checklisty
+
+Checklisty testowe generowane przez AI na podstawie analizy aplikacji.
+
+**Jak to działa:**
+1. Podaj URL docelowy, URL repozytorium lub opis aplikacji
+2. Agent AI analizuje funkcje i przepływy aplikacji
+3. Generuje kompleksową checklistę 10-25 scenariuszy testowych
+4. Każdy element zawiera tytuł, opis, oczekiwane zachowanie i priorytet
+
+**Kiedy używać:**
+- Rozpoczynanie QA dla nowej aplikacji
+- Kompleksowe planowanie testów regresyjnych
+- Wdrażanie nowych członków zespołu QA
+
+### 6. Generowanie testów z checklisty
+
+Testy Playwright E2E generowane przez AI z poszczególnych elementów checklisty.
+
+**Jak to działa:**
+1. Wybierz element checklisty opisujący scenariusz testowy
+2. Agent AI analizuje scenariusz i planuje kroki testu
+3. Generuje kompletny test Playwright z dostępnymi selektorami
+4. Waliduje składnię i udoskonala do 3 razy
+5. Zwraca gotowy do wykonania kod testu
+
+**Kiedy używać:**
+- Automatyzacja ręcznych checklist testowych
+- Generowanie testów E2E do testowania funkcjonalnego
+- Konwersja kryteriów akceptacji na wykonywalne testy
+
 ## Użytkowanie
 
 ### Przez Dashboard
