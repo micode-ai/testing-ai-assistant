@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
 import { getGenerations, getGenerationStats } from '@/lib/api/ai';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
 import type { AIGeneration, GenerationStats } from '@/types';
 
 export default function AIHubPage() {
@@ -51,11 +52,7 @@ export default function AIHubPage() {
   }, [projectId, token, t]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PageSkeleton cards={4} />;
   }
 
   if (error) {
