@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
 import { getGeneration, submitFeedback } from '@/lib/api/ai';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
 import type { AIGeneration } from '@/types';
 
 export default function GenerationDetailPage() {
@@ -65,11 +66,7 @@ export default function GenerationDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PageSkeleton cards={3} />;
   }
 
   if (error || !generation) {

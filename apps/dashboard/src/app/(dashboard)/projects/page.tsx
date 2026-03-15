@@ -15,6 +15,7 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
 import type { Project } from '@/types';
 
 const PROJECT_API_URL = process.env.NEXT_PUBLIC_PROJECT_API_URL || 'http://localhost:3003';
@@ -72,17 +73,7 @@ export default function ProjectsPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">{t('title')}</h2>
-            <p className="text-muted-foreground">{t('subtitle')}</p>
-          </div>
-        </div>
-        <p className="text-muted-foreground">{tc('loading')}</p>
-      </div>
-    );
+    return <PageSkeleton cards={3} />;
   }
 
   if (!currentOrgId) {

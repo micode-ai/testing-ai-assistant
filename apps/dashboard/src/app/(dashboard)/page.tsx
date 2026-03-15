@@ -23,6 +23,7 @@ import {
   CardTitle,
   CardContent,
 } from '@/components/ui/card';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
 import type { Organization, Project } from '@/types';
 
 const ORG_API_URL = process.env.NEXT_PUBLIC_ORG_API_URL || 'http://localhost:3002';
@@ -144,15 +145,7 @@ export default function DashboardHomePage() {
   ];
 
   if (isLoading) {
-    return (
-      <div className="space-y-8 max-w-4xl">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">{t('welcome')}</h2>
-          <p className="text-muted-foreground mt-1">{t('subtitle')}</p>
-        </div>
-        <p className="text-muted-foreground">{tc('loading')}</p>
-      </div>
-    );
+    return <PageSkeleton cards={4} />;
   }
 
   return (
