@@ -28,6 +28,36 @@ AIGeneration
 ├── accepted: Boolean? (принял ли пользователь результат)
 ├── feedback: String? (текстовый отзыв)
 └── createdAt: DateTime
+
+Conversation
+├── id: String (uuid)
+├── projectId: String
+├── userId: String
+├── title: String? (заголовок беседы)
+├── createdAt: DateTime
+├── updatedAt: DateTime
+└── messages: ChatMessage[] (связанные сообщения)
+
+ChatMessage
+├── id: String (uuid)
+├── conversationId: String (FK → Conversation)
+├── role: ChatMessageRole (USER | ASSISTANT | SYSTEM | TOOL)
+├── content: String (Text — содержимое сообщения)
+├── toolCalls: Json? (вызовы инструментов)
+├── tokensUsed: Int (количество использованных токенов)
+├── model: String? (использованная модель)
+└── createdAt: DateTime
+
+KnowledgeChunk
+├── id: String (uuid)
+├── projectId: String? (опциональная привязка к проекту)
+├── source: String (путь к исходному документу)
+├── title: String? (заголовок чанка)
+├── content: String (Text — текстовое содержимое)
+├── embedding: vector? (вектор эмбеддинга, pgvector)
+├── tokens: Int (количество токенов в чанке)
+├── createdAt: DateTime
+└── updatedAt: DateTime
 ```
 
 ### Перечисления
@@ -48,6 +78,12 @@ AIGeneration
 | `GET` | `/ai/generations/stats?projectId=` | Bearer JWT | Статистика генераций |
 | `GET` | `/ai/generations/:id` | Bearer JWT | Детали конкретной генерации |
 | `PATCH` | `/ai/generations/:id/feedback` | Bearer JWT | Обратная связь (принять/отклонить) |
+| `POST` | `/ai/chat` | Bearer JWT | Отправить сообщение в чат (SSE поток) |
+| `GET` | `/ai/chat/conversations?projectId=` | Bearer JWT | Список бесед |
+| `GET` | `/ai/chat/conversations/:id` | Bearer JWT | Получить беседу с сообщениями |
+| `DELETE` | `/ai/chat/conversations/:id` | Bearer JWT | Удалить беседу |
+| `POST` | `/ai/knowledge/index` | Bearer JWT | Переиндексация документации |
+| `GET` | `/ai/knowledge/search?q=&projectId=` | Bearer JWT | Поиск по базе знаний |
 
 ## Архитектура LangGraph-агентов
 
@@ -170,39 +206,132 @@ flowchart TD
 | `analyzeCoverage` | fast | Парсинг отчёта, выявление критических непокрытых путей |
 | `generateRecommendations` | advanced | Приоритизированные рекомендации с примерами тестового кода |
 
+## Архитектура чат-агента
+
+Чат-агент предоставляет разговорный интерфейс для взаимодействия с платформой. Он поддерживает многоходовые беседы с вызовом инструментов, контекстом из RAG базы знаний и потоковой передачей ответов через SSE.
+
+```mermaid
+flowchart TD
+    Start([User Message]) --> LoadHistory
+    LoadHistory["Load conversation<br/>history from DB"]
+    LoadHistory --> RAGSearch
+    RAGSearch["RAG search<br/>knowledge base for<br/>relevant context"]
+    RAGSearch --> BuildMessages
+    BuildMessages["Build messages array<br/>with system prompt,<br/>history, RAG context,<br/>and user message"]
+    BuildMessages --> LLM
+    LLM["Send to LLM<br/>with tool definitions"]
+    LLM --> ToolCheck{"Tool calls<br/>in response?"}
+    ToolCheck -- Yes --> ExecuteTools
+    ExecuteTools["Execute platform<br/>tools and collect results"]
+    ExecuteTools --> LLM
+    ToolCheck -- No --> Stream
+    Stream["Stream response<br/>to client via SSE"]
+    Stream --> Save
+    Save["Save user message<br/>and assistant response<br/>to DB"]
+    Save --> End([End])
+
+    style Start fill:#22c55e,color:#fff
+    style End fill:#22c55e,color:#fff
+    style ToolCheck fill:#eab308,color:#000
+```
+
+**Маршрутизация моделей**: Используется быстрая модель (gpt-4.1-mini) для низколатентных разговорных ответов.
+
+**Хранение бесед**: Каждая беседа сохраняется с полной историей сообщений. Беседы привязаны к проекту и пользователю, что позволяет задавать контекстные уточняющие вопросы.
+
+**Цикл инструментов**: Когда LLM решает вызвать инструмент, агент выполняет его и передаёт результат обратно в LLM. Этот цикл продолжается до тех пор, пока LLM не сформирует финальный текстовый ответ.
+
+## RAG база знаний
+
+База знаний обеспечивает генерацию с дополнением извлечением (RAG), индексируя документацию в векторные эмбеддинги для семантического поиска.
+
+### Принцип работы
+
+- Документация из `docs/en/` и `user_docs/en/` индексируется в записи `KnowledgeChunk`
+- Текст разбивается на чанки по ~500 токенов с перекрытием для сохранения контекста на границах
+- Эмбеддинги генерируются через OpenAI `text-embedding-3-small` (1536 измерений)
+- Эмбеддинги хранятся в колонках pgvector для эффективного поиска по косинусному сходству
+- При получении вопроса пользователя: эмбеддинг запроса, поиск top-K похожих чанков, внедрение в системный промпт в качестве контекста
+
+### Пайплайн индексации и запросов
+
+```mermaid
+flowchart TD
+    subgraph Indexing["Indexing Pipeline"]
+        Docs["Read docs from<br/>docs/en/ and user_docs/en/"] --> Split
+        Split["Split into ~500<br/>token chunks"] --> Embed
+        Embed["Generate embeddings<br/>via text-embedding-3-small"] --> Store
+        Store["Store chunks +<br/>vectors in pgvector"]
+    end
+
+    subgraph Query["Query Pipeline"]
+        Question["User question"] --> EmbedQuery
+        EmbedQuery["Embed query via<br/>text-embedding-3-small"] --> Search
+        Search["Cosine similarity<br/>search in pgvector"] --> TopK
+        TopK["Return top-K<br/>relevant chunks"] --> Inject
+        Inject["Inject chunks into<br/>system prompt as context"]
+    end
+
+    style Docs fill:#2563eb,color:#fff
+    style Store fill:#2563eb,color:#fff
+    style Question fill:#22c55e,color:#fff
+    style Inject fill:#22c55e,color:#fff
+```
+
+### Конфигурация
+
+| Параметр | Значение по умолчанию | Описание |
+|----------|----------------------|----------|
+| Размер чанка | ~500 токенов | Целевой размер каждого текстового чанка |
+| Перекрытие чанков | ~50 токенов | Перекрытие между последовательными чанками |
+| Модель эмбеддинга | `text-embedding-3-small` | Модель OpenAI для эмбеддингов (1536 измерений) |
+| Top-K | 5 | Количество чанков, возвращаемых на запрос |
+| Порог сходства | 0.7 | Минимальная оценка косинусного сходства для включения |
+
+## Инструменты платформы
+
+Чат-агент имеет доступ к инструментам платформы, позволяющим ему запрашивать данные и взаимодействовать с платформой тестирования от имени пользователя.
+
+| Инструмент | Описание | Целевой сервис |
+|-----------|----------|----------------|
+| `list_projects` | Список всех проектов, доступных пользователю | Project |
+| `list_pipelines` | Список пайплайнов для заданного проекта | Pipeline |
+| `trigger_pipeline` | Запуск нового пайплайна | Pipeline |
+| `get_run_status` | Получение текущего статуса тестового запуска | Pipeline |
+| `list_checklists` | Список тестовых чеклистов проекта | Pipeline |
+| `create_checklist` | Создание нового тестового чеклиста | Pipeline |
+| `run_checklist` | Выполнение запуска чеклиста | Pipeline |
+| `get_checklist_run` | Получение статуса и результатов запуска чеклиста | Pipeline |
+| `generate_tests` | Запуск ИИ-генерации тестов для исходного кода | AI |
+| `search_knowledge` | Поиск по RAG базе знаний | AI |
+
+Каждый инструмент определён с JSON Schema, описывающей его параметры. LLM самостоятельно решает, когда и как вызывать инструменты, основываясь на запросе пользователя. Результаты инструментов передаются обратно в LLM для включения в финальный ответ.
+
 ## Стратегия маршрутизации моделей
 
 Система использует две модели OpenAI для оптимального баланса между скоростью и качеством.
 
 ```mermaid
 flowchart LR
-    REQ[Запрос на генерацию] --> ROUTER{Маршрутизатор моделей}
+    Request["Запрос на генерацию"] --> Router{"Тип генерации?"}
+    Router -- "TEST_GEN" --> Advanced["o3<br/>(Продвинутая модель)"]
+    Router -- "BUG_DETECT" --> Advanced
+    Router -- "FLAKY_DETECT" --> Fast["gpt-4.1-mini<br/>(Быстрая модель)"]
+    Router -- "COVERAGE_ADVICE" --> Fast
+    Router -- "CHECKLIST_GEN" --> Advanced
+    Router -- "CHECKLIST_TEST_GEN" --> Advanced
+    Router -- "Chat" --> Fast
 
-    ROUTER -->|Простые задачи| FAST[gpt-4.1-mini<br/>Быстрая модель]
-    ROUTER -->|Сложные задачи| ADV[o3<br/>Продвинутая модель]
-
-    FAST --> RES[Результат]
-    ADV --> RES
-
-    style FAST fill:#4a9eff,color:#fff
-    style ADV fill:#ff6b6b,color:#fff
+    style Advanced fill:#7c3aed,color:#fff
+    style Fast fill:#2563eb,color:#fff
 ```
 
 ### Распределение задач
 
-| Задача | Модель | Обоснование |
-|--------|--------|------------|
-| Анализ структуры кода | fast (gpt-4.1-mini) | Извлечение метаданных — простая задача |
-| Генерация тестов | advanced (o3) | Требует глубокого понимания логики |
-| Валидация синтаксиса | fast (gpt-4.1-mini) | Формальная проверка |
-| Рефайн/исправление | advanced (o3) | Требует анализа ошибок и контекста |
-| Форматирование | fast (gpt-4.1-mini) | Механическое преобразование |
-| Парсинг результатов | fast (gpt-4.1-mini) | Структурированные данные |
-| Глубокий анализ diff | advanced (o3) | Поиск неочевидных зависимостей |
-| Cross-reference | advanced (o3) | Корреляция разнородных данных |
-| Генерация отчётов | fast (gpt-4.1-mini) | Шаблонный вывод |
-| Выявление паттернов | advanced (o3) | Сложный анализ зависимостей |
-| Рекомендации по покрытию | advanced (o3) | Приоритизация требует глубокого анализа |
+| Модель | Переменная | Области использования | Характеристики |
+|--------|-----------|----------------------|----------------|
+| **gpt-4.1-mini** | `OPENAI_MODEL_FAST` | Детекция flaky, советы по покрытию, чат | Низкая задержка, низкая стоимость, достаточно для поиска паттернов и бесед |
+| **o3** | `OPENAI_MODEL_ADVANCED` | Генерация тестов, обнаружение багов, генерация чеклистов, генерация тестов по чеклисту | Глубокое рассуждение, высокая точность для генерации кода |
 
 ### Параметры моделей
 

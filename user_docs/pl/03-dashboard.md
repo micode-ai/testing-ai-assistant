@@ -63,6 +63,14 @@ Kliknij na awatar w prawym górnym rogu i wybierz „Wyloguj się". Token zostan
 - **Informacja zwrotna** — zaakceptuj lub odrzuć z komentarzem
 - **Statystyki** — ogólna analityka generowań AI
 
+### Czat AI
+
+- **Interfejs czatu** — konwersacyjny asystent AI dla każdego projektu
+- **Wywoływanie narzędzi** — AI może tworzyć checklisty, uruchamiać pipeline'y, przeglądać wyniki
+- **Baza wiedzy** — odpowiada na pytania korzystając z zaindeksowanej dokumentacji (RAG)
+- **Historia konwersacji** — poprzednie czaty są zapisywane i dostępne z bocznego panelu
+- **Strumieniowe odpowiedzi** — wyświetlanie odpowiedzi w czasie rzeczywistym znak po znaku
+
 ### Pokrycie kodu
 
 - **Migawki pokrycia** — procent pokrycia na przebieg
@@ -96,9 +104,11 @@ Menu boczne zawiera główne sekcje:
 2. **Organizacje** — zarządzanie organizacjami
 3. **Projekty** — zarządzanie projektami
 4. **Pipeline'y** — pipeline'y testowe
-5. **AI** — generowanie i analiza AI
-6. **Powiadomienia** — ustawienia powiadomień
-7. **Ustawienia** — profil i preferencje
+5. **Listy kontrolne** — checklisty testowe
+6. **Czat** — asystent czatu AI
+7. **AI** — generowanie i analiza AI
+8. **Powiadomienia** — ustawienia powiadomień
+9. **Ustawienia** — profil i preferencje
 
 ## Wskazówki
 

@@ -232,6 +232,40 @@ http://localhost/api/<service>
 | `PATCH` | `/ai/generations/:id/feedback` | Informacja zwrotna |
 | `GET` | `/ai/generations/stats?projectId=<id>` | Statystyki |
 
+### Czat
+
+| Metoda | Ścieżka | Opis |
+|--------|---------|------|
+| `POST` | `/ai/chat` | Wysłanie wiadomości czatu (strumień SSE) |
+| `GET` | `/ai/chat/conversations?projectId=<id>` | Lista konwersacji |
+| `GET` | `/ai/chat/conversations/:id` | Pobranie konwersacji z wiadomościami |
+| `DELETE` | `/ai/chat/conversations/:id` | Usunięcie konwersacji |
+
+### Baza wiedzy
+
+| Metoda | Ścieżka | Opis |
+|--------|---------|------|
+| `POST` | `/ai/knowledge/index` | Przeindeksowanie dokumentacji do bazy wiedzy |
+| `GET` | `/ai/knowledge/search?q=<query>&projectId=<id>` | Wyszukiwanie w bazie wiedzy |
+
+#### POST /ai/chat
+
+```json
+// Żądanie
+{
+  "message": "Utwórz checklistę do testowania logowania",
+  "projectId": "uuid",
+  "conversationId": "uuid-opcjonalne"
+}
+
+// Odpowiedź: strumień SSE
+data: {"type":"text","content":"Utworzę checklistę...","conversationId":"uuid"}
+data: {"type":"tool_call","content":"{\"name\":\"create_checklist\",\"args\":{...}}","conversationId":"uuid"}
+data: {"type":"tool_result","content":"{\"name\":\"create_checklist\",\"result\":\"{...}\"}","conversationId":"uuid"}
+data: {"type":"text","content":"Gotowe! Utworzyłem...","conversationId":"uuid"}
+data: {"type":"done","content":"","conversationId":"uuid"}
+```
+
 #### POST /ai/generate
 
 ```json

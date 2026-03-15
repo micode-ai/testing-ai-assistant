@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { BarChart3, Bell, Building2, ClipboardList, FolderGit2, LayoutDashboard, Play, Sparkles } from 'lucide-react';
+import { BarChart3, Bell, Building2, ClipboardList, FolderGit2, LayoutDashboard, MessageSquare, Play, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { OrgSwitcher } from './org-switcher';
 import { LanguageSwitcher } from './language-switcher';
@@ -76,6 +76,18 @@ export function Sidebar() {
             >
               <ClipboardList className="h-4 w-4" />
               {t('checklists')}
+            </Link>
+            <Link
+              href={`${pathname.split('/').slice(0, 3).join('/')}/chat`}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ml-4',
+                pathname.includes('/chat')
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <MessageSquare className="h-4 w-4" />
+              {t('chat')}
             </Link>
             <Link
               href={`${pathname.split('/').slice(0, 3).join('/')}/ai`}

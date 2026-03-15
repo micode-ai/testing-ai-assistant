@@ -232,6 +232,40 @@ http://localhost/api/<service>
 | `PATCH` | `/ai/generations/:id/feedback` | Обратная связь |
 | `GET` | `/ai/generations/stats?projectId=<id>` | Статистика |
 
+### Чат
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `POST` | `/ai/chat` | Отправить сообщение в чат (SSE-поток) |
+| `GET` | `/ai/chat/conversations?projectId=<id>` | Список диалогов |
+| `GET` | `/ai/chat/conversations/:id` | Получить диалог с сообщениями |
+| `DELETE` | `/ai/chat/conversations/:id` | Удалить диалог |
+
+### База знаний
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `POST` | `/ai/knowledge/index` | Переиндексировать документацию в базу знаний |
+| `GET` | `/ai/knowledge/search?q=<query>&projectId=<id>` | Поиск по базе знаний |
+
+#### POST /ai/chat
+
+```json
+// Запрос
+{
+  "message": "Создай чек-лист для тестирования авторизации",
+  "projectId": "uuid",
+  "conversationId": "uuid-опционально"
+}
+
+// Ответ: SSE-поток
+data: {"type":"text","content":"Я создам чек-лист...","conversationId":"uuid"}
+data: {"type":"tool_call","content":"{\"name\":\"create_checklist\",\"args\":{...}}","conversationId":"uuid"}
+data: {"type":"tool_result","content":"{\"name\":\"create_checklist\",\"result\":\"{...}\"}","conversationId":"uuid"}
+data: {"type":"text","content":"Готово! Я создал...","conversationId":"uuid"}
+data: {"type":"done","content":"","conversationId":"uuid"}
+```
+
 #### POST /ai/generate
 
 ```json

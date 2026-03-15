@@ -7,6 +7,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { GenerationModule } from './generation/generation.module';
 import { AgentsModule } from './agents/agents.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
+import { ChatModule } from './chat/chat.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 
 @Module({
@@ -28,6 +30,8 @@ import { JwtStrategy } from './common/strategies/jwt.strategy';
     HealthModule,
     GenerationModule,
     AgentsModule,
+    KnowledgeModule,
+    ChatModule,
   ],
   providers: [JwtStrategy],
 })

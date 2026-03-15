@@ -43,6 +43,7 @@
     "runs": "Runs",
     "coverage": "Coverage",
     "checklists": "Checklists",
+    "chat": "Chat",
     "ai": "AI",
     "settings": "Settings",
     "notifications": "Notifications",
@@ -443,6 +444,15 @@
     "oauthSignin": "Error constructing an authorization URL.",
     "oauthCallback": "Error handling the OAuth callback.",
     "oauthAccountNotLinked": "This email is already associated with another account."
+  },
+  "chat": {
+    "newChat": "New Chat",
+    "untitled": "Untitled",
+    "welcomeTitle": "AI Chat Assistant",
+    "welcomeSubtitle": "Ask questions about the app, create checklists, trigger pipelines, and more.",
+    "inputPlaceholder": "Ask something...",
+    "result": "result",
+    "failedToLoad": "Failed to load chat"
   },
   "language": {
     "label": "Language",

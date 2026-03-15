@@ -90,7 +90,7 @@ services:
       - testing-ai-network
 
   pg-ai:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     ports:
       - '5440:5432'
     environment:

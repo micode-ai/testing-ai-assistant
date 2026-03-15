@@ -82,6 +82,12 @@ Access token получается через эндпоинты `/auth/login` и
 | `GET` | `/ai/generations/stats?projectId=` | Bearer JWT | Статистика генераций |
 | `GET` | `/ai/generations/:id` | Bearer JWT | Детали генерации |
 | `PATCH` | `/ai/generations/:id/feedback` | Bearer JWT | Обратная связь |
+| `POST` | `/ai/chat` | Bearer JWT | Отправить сообщение в чат (SSE поток) |
+| `GET` | `/ai/chat/conversations?projectId=` | Bearer JWT | Список бесед |
+| `GET` | `/ai/chat/conversations/:id` | Bearer JWT | Получить беседу с сообщениями |
+| `DELETE` | `/ai/chat/conversations/:id` | Bearer JWT | Удалить беседу |
+| `POST` | `/ai/knowledge/index` | Bearer JWT | Переиндексация документации |
+| `GET` | `/ai/knowledge/search?q=&projectId=` | Bearer JWT | Поиск по базе знаний |
 
 ### Notification Service (порт 3006)
 

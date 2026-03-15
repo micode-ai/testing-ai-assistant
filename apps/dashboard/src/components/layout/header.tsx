@@ -21,6 +21,7 @@ function usePageTitle(pathname: string): string {
   if (pathname.includes('/pipelines/new')) return t('newPipeline.title');
   if (pathname.includes('/pipelines')) return t('pipelines.title');
   if (pathname.includes('/coverage')) return t('nav.coverage');
+  if (pathname.includes('/chat')) return t('nav.chat');
   if (pathname.includes('/ai/generate')) return t('aiGenerate.title');
   if (pathname.includes('/ai')) return t('aiHub.title');
   if (pathname.includes('/runs') && pathname.includes('/artifacts')) return t('artifacts.title');
