@@ -44,7 +44,13 @@ export class OrganizationController {
   @ApiResponse({ status: 200, type: [OrganizationResponseDto] })
   async findAll(@CurrentUser() user: JwtPayload): Promise<OrganizationResponseDto[]> {
     const orgs = await this.organizationService.findByUser(user.sub);
-    return orgs.map((org) => OrganizationResponseDto.fromEntity(org));
+    const results = await Promise.all(
+      orgs.map(async (org) => {
+        const memberCount = await this.organizationService.getMemberCount(org.id);
+        return OrganizationResponseDto.fromEntity(org, memberCount);
+      }),
+    );
+    return results;
   }
 
   @Get(':orgId')
