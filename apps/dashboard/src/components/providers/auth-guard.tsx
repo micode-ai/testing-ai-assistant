@@ -14,12 +14,18 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     signOut({ callbackUrl: '/login' });
   }, []);
 
-  // Redirect if session was lost (e.g. expired server-side)
+  // Redirect if session was lost or refresh token expired
   useEffect(() => {
     if (status === 'unauthenticated') {
       handleSignOut();
+      return;
     }
-  }, [status, handleSignOut]);
+    // Check if JWT callback marked the token as expired
+    const error = (session as unknown as Record<string, unknown>)?.error;
+    if (error === 'RefreshTokenExpired') {
+      handleSignOut();
+    }
+  }, [status, session, handleSignOut]);
 
   // Global listener for AuthExpiredError thrown by API clients
   useEffect(() => {
