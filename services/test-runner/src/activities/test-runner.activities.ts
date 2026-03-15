@@ -30,6 +30,16 @@ export async function runUnitTests(
     };
   }
 
+  // If coverage collection is requested, use the coverage command instead
+  // so coverage files are generated for the coverage step to pick up
+  if (config.coverage === true || config.collectCoverage === true) {
+    const covCmd = project.coverageCommand;
+    if (covCmd) {
+      log.info('Using coverage command instead of test command', { covCmd });
+      testCmd = covCmd;
+    }
+  }
+
   const [cmd, ...args] = testCmd.split(' ');
 
   // Add JSON reporter if Jest is detected

@@ -30,8 +30,28 @@ export async function collectCoverage(
   }
 
   if (!coverageCmd) {
-    log.warn('No coverage command available');
+    log.warn('No coverage command available', { projectType: project.type, scripts: Object.keys(project.scripts) });
     return { linePct: 0, branchPct: 0, functionPct: 0, uncovered: [] };
+  }
+
+  // Ensure json-summary reporter is included for Node.js/Jest projects
+  // so we get coverage/coverage-summary.json even if the script doesn't configure it
+  if (project.type === 'node' && !coverageCmd.includes('coverageReporters')) {
+    const testScript = project.scripts['test'] || project.scripts['test:cov'] || '';
+    const isJest = testScript.includes('jest') || testScript.includes('react-scripts')
+      || fs.existsSync(path.join(workspacePath, 'jest.config.js'))
+      || fs.existsSync(path.join(workspacePath, 'jest.config.ts'))
+      || fs.existsSync(path.join(workspacePath, 'jest.config.mjs'));
+
+    if (isJest) {
+      // For direct script invocations (e.g. pnpm run test:cov), append via --
+      // Only if not already passing extra flags
+      if (!coverageCmd.includes('--')) {
+        coverageCmd += ' -- --coverageReporters=json-summary --coverageReporters=text';
+      } else if (!coverageCmd.includes('coverageReporters')) {
+        coverageCmd += ' --coverageReporters=json-summary --coverageReporters=text';
+      }
+    }
   }
 
   log.info('Running coverage command', { coverageCmd });
@@ -39,29 +59,36 @@ export async function collectCoverage(
   const execResult = await exec(cmd, args, {
     cwd: workspacePath,
     timeoutMs: 10 * 60 * 1000,
+    env: { FORCE_COLOR: '0' }, // Disable color codes that can interfere with parsing
   });
 
   log.info('Coverage command finished', {
     exitCode: execResult.exitCode,
     stdoutLength: execResult.stdout.length,
+    stderrLength: execResult.stderr.length,
     stderrSnippet: execResult.stderr.slice(0, 500),
   });
 
   // Search for coverage files in multiple common locations
   const result = tryParseCoverageFiles(workspacePath);
   if (result) {
-    log.info('Coverage data collected', result);
+    log.info('Coverage data collected from files', result);
     return result;
   }
 
   // If command ran but no files found, try parsing coverage from stdout
-  const stdoutCoverage = parseCoverageFromStdout(execResult.stdout + execResult.stderr);
+  const combined = execResult.stdout + execResult.stderr;
+  const stdoutCoverage = parseCoverageFromStdout(combined);
   if (stdoutCoverage) {
     log.info('Coverage parsed from stdout', stdoutCoverage);
     return stdoutCoverage;
   }
 
-  log.warn('Could not parse coverage output');
+  log.warn('Could not parse coverage output', {
+    exitCode: execResult.exitCode,
+    stdoutSnippet: execResult.stdout.slice(-500),
+    stderrSnippet: execResult.stderr.slice(-500),
+  });
   return { linePct: 0, branchPct: 0, functionPct: 0, uncovered: [] };
 }
 
@@ -92,8 +119,44 @@ export async function compareCoverage(
 
 /**
  * Tries to find and parse coverage files in common locations.
+ * Searches the workspace root and one level of subdirectories (monorepo packages).
  */
 function tryParseCoverageFiles(workspacePath: string): CoverageResult | null {
+  // First try the workspace root
+  const rootResult = tryParseCoverageInDir(workspacePath);
+  if (rootResult) return rootResult;
+
+  // Search one level of subdirectories for monorepo projects
+  // (e.g. packages/foo/coverage/, apps/web/coverage/)
+  const subDirCandidates = ['packages', 'apps', 'services', 'libs', 'src'];
+  for (const subDir of subDirCandidates) {
+    const subDirPath = path.join(workspacePath, subDir);
+    if (!fs.existsSync(subDirPath) || !fs.statSync(subDirPath).isDirectory()) continue;
+
+    try {
+      const children = fs.readdirSync(subDirPath);
+      for (const child of children) {
+        const childPath = path.join(subDirPath, child);
+        if (!fs.statSync(childPath).isDirectory()) continue;
+
+        const childResult = tryParseCoverageInDir(childPath);
+        if (childResult) {
+          log.info('Found coverage data in subdirectory', { subPath: `${subDir}/${child}` });
+          return childResult;
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Tries to parse coverage files in a single directory.
+ */
+function tryParseCoverageInDir(dirPath: string): CoverageResult | null {
   // Search multiple common coverage output locations
   const jsonPaths = [
     'coverage/coverage-summary.json',
@@ -107,8 +170,9 @@ function tryParseCoverageFiles(workspacePath: string): CoverageResult | null {
   ];
 
   for (const rel of jsonPaths) {
-    const fullPath = path.join(workspacePath, rel);
+    const fullPath = path.join(dirPath, rel);
     if (fs.existsSync(fullPath)) {
+      log.info('Found coverage JSON file', { path: fullPath });
       try {
         const data = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
         if (data.total) {
@@ -123,7 +187,8 @@ function tryParseCoverageFiles(workspacePath: string): CoverageResult | null {
         if (Object.values(data).some((v: any) => v && typeof v === 'object' && 's' in v)) {
           return parseCoverageFinal(data);
         }
-      } catch {
+      } catch (err) {
+        log.warn('Failed to parse coverage JSON', { path: fullPath, error: String(err) });
         continue;
       }
     }
@@ -137,18 +202,23 @@ function tryParseCoverageFiles(workspacePath: string): CoverageResult | null {
   ];
 
   for (const rel of lcovPaths) {
-    const fullPath = path.join(workspacePath, rel);
+    const fullPath = path.join(dirPath, rel);
     if (fs.existsSync(fullPath)) {
+      log.info('Found lcov file', { path: fullPath });
       try {
-        return parseLcov(fs.readFileSync(fullPath, 'utf-8'));
-      } catch {
+        const result = parseLcov(fs.readFileSync(fullPath, 'utf-8'));
+        if (result.linePct > 0 || result.branchPct > 0 || result.functionPct > 0) {
+          return result;
+        }
+      } catch (err) {
+        log.warn('Failed to parse lcov', { path: fullPath, error: String(err) });
         continue;
       }
     }
   }
 
   // Clover XML (common in PHP/Java)
-  const cloverPath = path.join(workspacePath, 'coverage', 'clover.xml');
+  const cloverPath = path.join(dirPath, 'coverage', 'clover.xml');
   if (fs.existsSync(cloverPath)) {
     try {
       return parseCloverXml(fs.readFileSync(cloverPath, 'utf-8'));
@@ -158,13 +228,13 @@ function tryParseCoverageFiles(workspacePath: string): CoverageResult | null {
   }
 
   // Go coverage
-  const goCoveragePath = path.join(workspacePath, 'coverage.out');
+  const goCoveragePath = path.join(dirPath, 'coverage.out');
   if (fs.existsSync(goCoveragePath)) {
-    return parseGoCoverage(workspacePath, goCoveragePath);
+    return parseGoCoverage(dirPath, goCoveragePath);
   }
 
   // Python .coverage / coverage.xml
-  const pyCoveragePath = path.join(workspacePath, 'coverage.xml');
+  const pyCoveragePath = path.join(dirPath, 'coverage.xml');
   if (fs.existsSync(pyCoveragePath)) {
     try {
       return parseCoberturaXml(fs.readFileSync(pyCoveragePath, 'utf-8'));
@@ -193,7 +263,18 @@ function parseCoverageFromStdout(output: string): CoverageResult | null {
     };
   }
 
-  // Vitest format: Coverage: 85.71% Statements, 75% Branches, 100% Functions, 85.71% Lines
+  // Alternative: Stmts | Branch | Funcs | Lines (table header format)
+  const tableMatch = output.match(/% ?Stmts\s*\|\s*% ?Branch\s*\|\s*% ?Funcs\s*\|\s*% ?Lines[\s\S]*?All files\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)/);
+  if (tableMatch) {
+    return {
+      linePct: parseFloat(tableMatch[4]),
+      branchPct: parseFloat(tableMatch[2]),
+      functionPct: parseFloat(tableMatch[3]),
+      uncovered: [],
+    };
+  }
+
+  // Vitest format: Statements : 85.71% ... Branches : 75% ... Functions : 100% ... Lines : 85.71%
   const vitestMatch = output.match(/Statements\s*:\s*([\d.]+)%.*?Branches\s*:\s*([\d.]+)%.*?Functions\s*:\s*([\d.]+)%.*?Lines\s*:\s*([\d.]+)%/s);
   if (vitestMatch) {
     return {
@@ -204,13 +285,14 @@ function parseCoverageFromStdout(output: string): CoverageResult | null {
     };
   }
 
-  // Alternative: Stmts | Branch | Funcs | Lines (table header format)
-  const tableMatch = output.match(/Stmts\s*\|\s*Branch\s*\|\s*Funcs\s*\|\s*Lines[\s\S]*?All files\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)/);
-  if (tableMatch) {
+  // Jest "text" reporter alternate format (without "All files" row, just individual files and a summary)
+  // Stmts | Branch | Funcs | Lines ... followed by percentage rows
+  const stmtsPctMatch = output.match(/(?:^|\n)\s*(?:All files?|TOTAL)\s*\|?\s*([\d.]+)\s*%?\s*\|?\s*([\d.]+)\s*%?\s*\|?\s*([\d.]+)\s*%?\s*\|?\s*([\d.]+)/m);
+  if (stmtsPctMatch) {
     return {
-      linePct: parseFloat(tableMatch[4]),
-      branchPct: parseFloat(tableMatch[2]),
-      functionPct: parseFloat(tableMatch[3]),
+      linePct: parseFloat(stmtsPctMatch[4]),
+      branchPct: parseFloat(stmtsPctMatch[2]),
+      functionPct: parseFloat(stmtsPctMatch[3]),
       uncovered: [],
     };
   }

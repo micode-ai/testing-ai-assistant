@@ -77,10 +77,10 @@ async function runCoverageAsStep(
     const result = await coverage.collectCoverage(workspacePath, config);
     const hasData = result.linePct > 0 || result.branchPct > 0 || result.functionPct > 0;
     return {
-      status: hasData ? 'passed' : 'errored',
+      status: hasData ? 'passed' : 'failed',
       summary: hasData
         ? `Coverage: ${result.linePct}% lines, ${result.branchPct}% branches, ${result.functionPct}% functions`
-        : 'No coverage data found. Ensure your test framework generates coverage output.',
+        : 'No coverage data found. Ensure your project has a "test:cov" script or that tests generate coverage output (e.g. jest --coverage).',
       details: {
         linePct: result.linePct,
         branchPct: result.branchPct,

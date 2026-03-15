@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../common/decorators/public.decorator';
 import { TestRunService } from './test-run.service';
 import { TestResultService } from '../test-result/test-result.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UpdateRunStatusDto } from './dto/update-run-status.dto';
 import { ReportStepResultDto } from './dto/report-step-result.dto';
 import { toPrismaCheckType, toPrismaStatus } from './check-type.mapper';
@@ -25,6 +26,7 @@ export class RunReportController {
   constructor(
     private readonly testRunService: TestRunService,
     private readonly testResultService: TestResultService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Patch(':runId/status')
@@ -83,6 +85,7 @@ export class RunReportController {
         details: dto.details || undefined,
         durationMs: dto.durationMs || 0,
       });
+      await this.saveCoverageSnapshot(prismaCheckType, existing.id, dto.details);
       return { id: updated.id, status: updated.status };
     }
 
@@ -95,6 +98,47 @@ export class RunReportController {
       durationMs: dto.durationMs || 0,
     });
 
+    await this.saveCoverageSnapshot(prismaCheckType, result.id, dto.details);
+
     return { id: result.id, status: result.status };
+  }
+
+  /**
+   * Persists a CoverageSnapshot when a COVERAGE step result contains coverage data.
+   */
+  private async saveCoverageSnapshot(
+    checkType: string,
+    resultId: string,
+    details?: Record<string, unknown>,
+  ): Promise<void> {
+    if (checkType !== 'COVERAGE' || !details) return;
+
+    const linePct = typeof details.linePct === 'number' ? details.linePct : 0;
+    const branchPct = typeof details.branchPct === 'number' ? details.branchPct : 0;
+    const functionPct = typeof details.functionPct === 'number' ? details.functionPct : 0;
+
+    if (linePct === 0 && branchPct === 0 && functionPct === 0) return;
+
+    try {
+      await this.prisma.coverageSnapshot.upsert({
+        where: { resultId },
+        create: {
+          resultId,
+          linePct,
+          branchPct,
+          functionPct,
+          uncovered: (details.uncovered as any) ?? {},
+        },
+        update: {
+          linePct,
+          branchPct,
+          functionPct,
+          uncovered: (details.uncovered as any) ?? {},
+        },
+      });
+      this.logger.log(`Coverage snapshot saved for result ${resultId}`);
+    } catch (err) {
+      this.logger.warn(`Failed to save coverage snapshot: ${err}`);
+    }
   }
 }
