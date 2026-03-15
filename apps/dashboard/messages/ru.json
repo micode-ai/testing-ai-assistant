@@ -331,6 +331,10 @@
     "uncoveredFiles": "Непокрытые файлы",
     "uncoveredLines": "Непокрытые строки:"
   },
+  "runs": {
+    "noRuns": "Нет тестовых запусков",
+    "noRunsDescription": "Тестовые запуски появятся здесь при запуске пайплайна."
+  },
   "testRun": {
     "title": "Тестовый запуск",
     "stepsCompleted": "{completed} из {total} шагов выполнено",
