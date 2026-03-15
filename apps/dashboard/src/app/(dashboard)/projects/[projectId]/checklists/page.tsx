@@ -8,14 +8,16 @@ import { Plus, FileUp, ClipboardList } from 'lucide-react';
 import { getChecklists, type Checklist } from '@/lib/api/checklists';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
+import { EmptyState } from '@/components/shared/empty-state';
+import { ErrorAlert } from '@/components/shared/error-alert';
 
 const priorityColors: Record<string, string> = {
-  LOW: 'bg-gray-100 text-gray-700',
-  MEDIUM: 'bg-blue-100 text-blue-700',
-  HIGH: 'bg-orange-100 text-orange-700',
-  CRITICAL: 'bg-red-100 text-red-700',
+  LOW: 'bg-priority-low-bg text-priority-low-fg',
+  MEDIUM: 'bg-priority-medium-bg text-priority-medium-fg',
+  HIGH: 'bg-priority-high-bg text-priority-high-fg',
+  CRITICAL: 'bg-priority-critical-bg text-priority-critical-fg',
 };
 
 export default function ChecklistsPage() {
@@ -25,25 +27,33 @@ export default function ChecklistsPage() {
   const t = useTranslations();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
 
-  useEffect(() => {
+  const fetchChecklists = () => {
     if (!token) return;
+    setError(null);
+    setIsLoading(true);
     getChecklists(params.projectId, token)
       .then(setChecklists)
-      .catch(() => {})
+      .catch((err) => {
+        setError(err?.message || 'Failed to load checklists');
+      })
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    fetchChecklists();
   }, [params.projectId, token]);
 
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
+    return <PageSkeleton cards={3} />;
+  }
+
+  if (error) {
+    return <ErrorAlert message={error} onRetry={fetchChecklists} />;
   }
 
   return (
@@ -63,22 +73,29 @@ export default function ChecklistsPage() {
       </div>
 
       {checklists.length === 0 && (
-        <div className="text-center py-12">
-          <ClipboardList className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No checklists yet</h3>
-          <p className="text-sm text-muted-foreground mt-1">Create a test checklist to start testing your application</p>
-          <Button className="mt-4" onClick={() => router.push(`/projects/${params.projectId}/checklists/new`)}>
-            Create Checklist
-          </Button>
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title="No checklists yet"
+          description="Create a test checklist to start testing your application"
+          actionLabel="Create Checklist"
+          onAction={() => router.push(`/projects/${params.projectId}/checklists/new`)}
+        />
       )}
 
       <div className="grid gap-4">
         {checklists.map((cl) => (
           <Card
             key={cl.id}
-            className="cursor-pointer hover:border-primary/50 transition-colors"
+            className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-shadow transition-colors"
+            role="button"
+            tabIndex={0}
             onClick={() => router.push(`/projects/${params.projectId}/checklists/${cl.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                router.push(`/projects/${params.projectId}/checklists/${cl.id}`);
+              }
+            }}
           >
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">

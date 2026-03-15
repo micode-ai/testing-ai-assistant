@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { Clock, Play } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { RunStatusBadge } from '@/components/shared/run-status-badge';
-import type { TestRun, RunStatus } from '@/types';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
+import { EmptyState } from '@/components/shared/empty-state';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import type { TestRun } from '@/types';
 
 const PIPELINE_API_URL = process.env.NEXT_PUBLIC_PIPELINE_API_URL || 'http://localhost:3004';
 
@@ -16,10 +18,7 @@ async function getRecentRuns(token: string): Promise<TestRun[]> {
   const res = await fetch(`${PIPELINE_API_URL}/test-runs/recent`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    // Fallback: endpoint may not exist yet, return empty
-    return [];
-  }
+  if (!res.ok) return [];
   return res.json();
 }
 
@@ -29,46 +28,54 @@ export default function RunsListPage() {
   const t = useTranslations();
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
 
-  useEffect(() => {
+  function fetchRuns() {
     if (!token) return;
+    setError(null);
+    setIsLoading(true);
     getRecentRuns(token)
       .then(setRuns)
-      .catch(() => {})
+      .catch((err) => setError(err?.message || 'Failed to load runs'))
       .finally(() => setIsLoading(false));
+  }
+
+  useEffect(() => {
+    if (!token) return;
+    fetchRuns();
   }, [token]);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </div>
-    );
-  }
+  if (isLoading) return <PageSkeleton cards={4} />;
+  if (error) return <ErrorAlert message={error} onRetry={fetchRuns} />;
 
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold tracking-tight">{t('nav.runs')}</h2>
 
       {runs.length === 0 && (
-        <div className="text-center py-12">
-          <Play className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">{t('runs.noRuns')}</h3>
-          <p className="text-sm text-muted-foreground mt-1">{t('runs.noRunsDescription')}</p>
-        </div>
+        <EmptyState
+          icon={Play}
+          title={t('runs.noRuns')}
+          description={t('runs.noRunsDescription')}
+        />
       )}
 
       <div className="space-y-2">
         {runs.map((run) => (
           <Card
             key={run.id}
-            className="cursor-pointer hover:border-primary/50 transition-colors"
+            className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
+            role="button"
+            tabIndex={0}
             onClick={() => router.push(`/runs/${run.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                router.push(`/runs/${run.id}`);
+              }
+            }}
           >
             <CardHeader className="py-3">
               <div className="flex items-center justify-between">
@@ -82,7 +89,7 @@ export default function RunsListPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
+                  <Clock className="h-3 w-3" aria-hidden="true" />
                   <span>{new Date(run.createdAt).toLocaleString()}</span>
                 </div>
               </div>

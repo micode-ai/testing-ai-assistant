@@ -60,8 +60,9 @@ export function Header() {
           size="icon"
           onClick={() => signOut({ callbackUrl: '/login' })}
           title={t('signOut')}
+          aria-label={t('signOut')}
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
     </header>

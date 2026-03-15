@@ -44,6 +44,28 @@ const config: Config = {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
         },
+        status: {
+          passed: 'hsl(var(--status-passed))',
+          failed: 'hsl(var(--status-failed))',
+          error: 'hsl(var(--status-error))',
+          warning: 'hsl(var(--status-warning))',
+          running: 'hsl(var(--status-running))',
+          pending: 'hsl(var(--status-pending))',
+        },
+        priority: {
+          'low-bg': 'hsl(var(--priority-low-bg))',
+          'low-fg': 'hsl(var(--priority-low-fg))',
+          'medium-bg': 'hsl(var(--priority-medium-bg))',
+          'medium-fg': 'hsl(var(--priority-medium-fg))',
+          'high-bg': 'hsl(var(--priority-high-bg))',
+          'high-fg': 'hsl(var(--priority-high-fg))',
+          'critical-bg': 'hsl(var(--priority-critical-bg))',
+          'critical-fg': 'hsl(var(--priority-critical-fg))',
+        },
+        code: {
+          bg: 'hsl(var(--code-bg))',
+          fg: 'hsl(var(--code-fg))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

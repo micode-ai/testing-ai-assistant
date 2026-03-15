@@ -19,13 +19,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
 
 const priorityColors: Record<string, string> = {
-  LOW: 'bg-gray-100 text-gray-700',
-  MEDIUM: 'bg-blue-100 text-blue-700',
-  HIGH: 'bg-orange-100 text-orange-700',
-  CRITICAL: 'bg-red-100 text-red-700',
+  LOW: 'bg-priority-low-bg text-priority-low-fg',
+  MEDIUM: 'bg-priority-medium-bg text-priority-medium-fg',
+  HIGH: 'bg-priority-high-bg text-priority-high-fg',
+  CRITICAL: 'bg-priority-critical-bg text-priority-critical-fg',
 };
 
 export default function ChecklistDetailPage() {
@@ -151,7 +151,7 @@ export default function ChecklistDetailPage() {
   }
 
   if (isLoading) {
-    return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-64 w-full" /></div>;
+    return <PageSkeleton cards={4} />;
   }
 
   if (!checklist) {
@@ -214,8 +214,19 @@ export default function ChecklistDetailPage() {
           const hasTest = !!item.generatedTestCode;
 
           return (
-            <Card key={item.id}>
-              <CardHeader className="py-3 cursor-pointer" onClick={() => toggleExpand(item.id)}>
+            <Card key={item.id} className="hover:shadow-md transition-shadow">
+              <CardHeader
+                className="py-3 cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleExpand(item.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleExpand(item.id);
+                  }
+                }}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -254,11 +265,17 @@ export default function ChecklistDetailPage() {
                           variant="outline" size="sm"
                           onClick={(e) => { e.stopPropagation(); onGenerateTest(item); }}
                           disabled={isGenerating}
+                          aria-label={isGenerating ? 'Generating test' : hasTest ? 'Regenerate test' : 'Generate test'}
                         >
                           <Sparkles className="mr-1 h-3 w-3" />
                           {isGenerating ? 'Generating...' : hasTest ? 'Regenerate Test' : 'Generate Test'}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}
+                          aria-label="Delete item"
+                        >
                           <Trash2 className="h-3 w-3 text-red-500" />
                         </Button>
                       </div>
@@ -268,7 +285,7 @@ export default function ChecklistDetailPage() {
                           <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3 text-green-600" /> Generated test code
                           </summary>
-                          <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-950 text-zinc-200 p-3 text-xs max-h-64 overflow-y-auto">
+                          <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg text-code-fg p-3 text-xs max-h-64 overflow-y-auto">
                             {item.generatedTestCode}
                           </pre>
                         </details>
