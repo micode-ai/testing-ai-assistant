@@ -8,9 +8,10 @@ import {
 } from 'lucide-react';
 import { getChecklistRun, type ChecklistRun } from '@/lib/api/checklists';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { RunStatusBadge } from '@/components/shared/run-status-badge';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
+import { ErrorAlert } from '@/components/shared/error-alert';
 
 function formatDuration(ms: number | null): string {
   if (!ms) return '-';
@@ -21,11 +22,11 @@ function formatDuration(ms: number | null): string {
 
 function ItemStatusIcon({ status }: { status: string }) {
   switch (status) {
-    case 'PASSED': return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-    case 'FAILED': return <XOctagon className="h-5 w-5 text-red-600" />;
-    case 'RUNNING': return <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />;
-    case 'SKIPPED': return <AlertTriangle className="h-5 w-5 text-orange-500" />;
-    default: return <CircleDot className="h-5 w-5 text-gray-300" />;
+    case 'PASSED': return <CheckCircle2 className="h-5 w-5 text-status-passed" aria-label="Passed" />;
+    case 'FAILED': return <XOctagon className="h-5 w-5 text-status-failed" aria-label="Failed" />;
+    case 'RUNNING': return <Loader2 className="h-5 w-5 text-status-running animate-spin" aria-label="Running" />;
+    case 'SKIPPED': return <AlertTriangle className="h-5 w-5 text-status-error" aria-label="Skipped" />;
+    default: return <CircleDot className="h-5 w-5 text-status-pending" aria-label="Pending" />;
   }
 }
 
@@ -35,14 +36,16 @@ export default function ChecklistRunPage() {
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
   const [run, setRun] = useState<ChecklistRun | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchRun = useCallback(async () => {
     if (!token) return;
+    setError(null);
     try {
       const data = await getChecklistRun(params.runId, token);
       setRun(data);
-    } catch {
-      // handle
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load checklist run');
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +64,11 @@ export default function ChecklistRunPage() {
   }, [token, run?.status, fetchRun]);
 
   if (isLoading) {
-    return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-64 w-full" /></div>;
+    return <PageSkeleton cards={4} />;
+  }
+
+  if (error) {
+    return <ErrorAlert message={error} onRetry={fetchRun} />;
   }
 
   if (!run) {
@@ -104,8 +111,8 @@ export default function ChecklistRunPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3">
         <StatCard label="Total" value={total} />
-        <StatCard label="Passed" value={passed} className="text-green-600" />
-        <StatCard label="Failed" value={failed} className={failed > 0 ? 'text-red-600' : ''} />
+        <StatCard label="Passed" value={passed} className="text-status-passed" />
+        <StatCard label="Failed" value={failed} className={failed > 0 ? 'text-status-failed' : ''} />
         <StatCard label="Progress" value={`${progressPct}%`} />
       </div>
 
@@ -133,7 +140,7 @@ export default function ChecklistRunPage() {
           const isRunning = r.status === 'RUNNING';
 
           return (
-            <Card key={r.id} className={isRunning ? 'border-blue-200 bg-blue-50/30' : ''}>
+            <Card key={r.id} className={`hover:shadow-md transition-shadow ${isRunning ? 'border-status-running/20 bg-status-running/5' : ''}`}>
               <CardHeader className="py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -155,7 +162,7 @@ export default function ChecklistRunPage() {
                     <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
                       Show output
                     </summary>
-                    <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-950 text-zinc-200 p-3 text-xs max-h-64 overflow-y-auto whitespace-pre-wrap break-all">
+                    <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg text-code-fg p-3 text-xs max-h-64 overflow-y-auto whitespace-pre-wrap break-all">
                       {output}
                     </pre>
                   </details>

@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { getTestRun, cancelTestRun, subscribeToRun } from '@/lib/api/test-runs';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
   Card,
@@ -20,6 +19,8 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { RunStatusBadge } from '@/components/shared/run-status-badge';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import { PageSkeleton } from '@/components/shared/page-skeleton';
 import type { TestRun, RunStatus } from '@/types';
 
 function formatDuration(ms: number | null): string {
@@ -34,17 +35,17 @@ function formatDuration(ms: number | null): string {
 function StepStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'PASSED':
-      return <CheckCircle2 className="h-5 w-5 text-green-600" />;
+      return <CheckCircle2 className="h-5 w-5 text-status-passed" aria-label="Passed" />;
     case 'FAILED':
-      return <XOctagon className="h-5 w-5 text-red-600" />;
+      return <XOctagon className="h-5 w-5 text-status-failed" aria-label="Failed" />;
     case 'ERRORED':
-      return <AlertTriangle className="h-5 w-5 text-orange-500" />;
+      return <AlertTriangle className="h-5 w-5 text-status-error" aria-label="Errored" />;
     case 'RUNNING':
-      return <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />;
+      return <Loader2 className="h-5 w-5 text-status-running animate-spin" aria-label="Running" />;
     case 'CANCELLED':
-      return <XCircle className="h-5 w-5 text-gray-400" />;
+      return <XCircle className="h-5 w-5 text-status-pending" aria-label="Cancelled" />;
     default:
-      return <CircleDot className="h-5 w-5 text-gray-300" />;
+      return <CircleDot className="h-5 w-5 text-status-pending" aria-label="Pending" />;
   }
 }
 
@@ -115,22 +116,22 @@ function StepDetails({ step }: { step: TestRun['steps'][number] }) {
           {totalTests !== undefined && (
             <>
               <StatCard label="Total" value={totalTests} />
-              <StatCard label="Passed" value={passed ?? 0} className="text-green-600" />
-              <StatCard label="Failed" value={failed ?? 0} className={failed ? 'text-red-600' : ''} />
+              <StatCard label="Passed" value={passed ?? 0} className="text-status-passed" />
+              <StatCard label="Failed" value={failed ?? 0} className={failed ? 'text-status-failed' : ''} />
               <StatCard label="Skipped" value={skipped ?? 0} />
             </>
           )}
           {errors !== undefined && (
             <>
-              <StatCard label="Errors" value={errors} className={errors ? 'text-red-600' : 'text-green-600'} />
-              <StatCard label="Warnings" value={warnings ?? 0} className={warnings ? 'text-yellow-600' : ''} />
+              <StatCard label="Errors" value={errors} className={errors ? 'text-status-failed' : 'text-status-passed'} />
+              <StatCard label="Warnings" value={warnings ?? 0} className={warnings ? 'text-status-warning' : ''} />
             </>
           )}
           {critical !== undefined && (
             <>
-              <StatCard label="Critical" value={critical} className={critical ? 'text-red-600' : ''} />
-              <StatCard label="High" value={high ?? 0} className={high ? 'text-red-500' : ''} />
-              <StatCard label="Moderate" value={moderate ?? 0} className={moderate ? 'text-yellow-600' : ''} />
+              <StatCard label="Critical" value={critical} className={critical ? 'text-status-failed' : ''} />
+              <StatCard label="High" value={high ?? 0} className={high ? 'text-status-failed' : ''} />
+              <StatCard label="Moderate" value={moderate ?? 0} className={moderate ? 'text-status-warning' : ''} />
               <StatCard label="Low" value={low ?? 0} />
             </>
           )}
@@ -143,7 +144,7 @@ function StepDetails({ step }: { step: TestRun['steps'][number] }) {
           <p className="text-xs font-medium text-muted-foreground">Findings</p>
           {findings.map((f, i) => (
             <div key={i} className="flex items-center gap-2 text-xs">
-              <span className={`inline-block w-2 h-2 rounded-full ${f.severity === 'high' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+              <span className={`inline-block w-2 h-2 rounded-full ${f.severity === 'high' ? 'bg-status-failed' : 'bg-status-warning'}`} />
               <span>{f.pattern}</span>
               <span className="text-muted-foreground">({f.count} file(s))</span>
             </div>
@@ -167,7 +168,7 @@ function StepDetails({ step }: { step: TestRun['steps'][number] }) {
           <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
             Show output log
           </summary>
-          <pre className="mt-2 overflow-x-auto rounded-md bg-zinc-950 text-zinc-200 p-3 text-xs max-h-96 overflow-y-auto whitespace-pre-wrap break-all">
+          <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg text-code-fg p-3 text-xs max-h-96 overflow-y-auto whitespace-pre-wrap break-all">
             {output}
           </pre>
         </details>
@@ -195,6 +196,7 @@ export default function RunDetailPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [sseReady, setSseReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
@@ -205,6 +207,7 @@ export default function RunDetailPage() {
       return;
     }
     try {
+      setError(null);
       const data = await getTestRun(runId, token);
       if (!data.steps) {
         data.steps = [];
@@ -214,8 +217,8 @@ export default function RunDetailPage() {
       if (!isTerminal) {
         setSseReady(true);
       }
-    } catch {
-      // Silently fail
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load test run');
     } finally {
       setIsLoading(false);
     }
@@ -275,8 +278,8 @@ export default function RunDetailPage() {
     try {
       const updated = await cancelTestRun(runId, token);
       setRun(updated);
-    } catch {
-      // Silently fail
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel test run');
     } finally {
       setIsCancelling(false);
     }
@@ -295,19 +298,18 @@ export default function RunDetailPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+    return <PageSkeleton cards={4} />;
   }
 
   if (!run) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">{t('testRun.notFound')}</p>
+      <div className="space-y-4">
+        {error && <ErrorAlert message={error} onRetry={fetchRun} />}
+        {!error && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">{t('testRun.notFound')}</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -322,6 +324,8 @@ export default function RunDetailPage() {
 
   return (
     <div className="space-y-6">
+      {error && <ErrorAlert message={error} onRetry={fetchRun} />}
+
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -399,10 +403,18 @@ export default function RunDetailPage() {
               const summaryText = (step.details as Record<string, unknown>)?.summary as string | undefined;
 
               return (
-                <Card key={step.id} className={isRunning ? 'border-blue-200 bg-blue-50/30' : ''}>
+                <Card key={step.id} className={`hover:shadow-md transition-shadow ${isRunning ? 'border-status-running/20 bg-status-running/5' : ''}`}>
                   <CardHeader
                     className={`cursor-pointer py-3 ${hasDetails ? '' : 'cursor-default'}`}
                     onClick={() => hasDetails && toggleStep(step.id)}
+                    role={hasDetails ? 'button' : undefined}
+                    tabIndex={hasDetails ? 0 : undefined}
+                    onKeyDown={hasDetails ? (e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleStep(step.id);
+                      }
+                    } : undefined}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -410,7 +422,7 @@ export default function RunDetailPage() {
                         <div>
                           <CardTitle className="text-sm font-medium">{step.name}</CardTitle>
                           {isRunning && (
-                            <p className="text-xs text-blue-600 animate-pulse">
+                            <p className="text-xs text-status-running animate-pulse">
                               {summaryText || `${step.name} in progress...`}
                             </p>
                           )}
