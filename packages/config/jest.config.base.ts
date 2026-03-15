@@ -24,7 +24,7 @@ const baseConfig: Config = {
     },
   },
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'clover'],
+  coverageReporters: ['text', 'lcov', 'clover', 'json-summary'],
 };
 
 export default baseConfig;
