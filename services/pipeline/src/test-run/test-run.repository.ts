@@ -24,6 +24,13 @@ export class TestRunRepository {
     });
   }
 
+  async findRecent(limit = 50): Promise<TestRun[]> {
+    return this.prisma.testRun.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
   async create(data: Prisma.TestRunUncheckedCreateInput): Promise<TestRun> {
     return this.prisma.testRun.create({ data });
   }

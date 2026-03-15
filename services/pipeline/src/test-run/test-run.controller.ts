@@ -37,6 +37,14 @@ export class TestRunController {
     return runs.map((r) => TestRunResponseDto.fromEntity(r));
   }
 
+  @Get('recent')
+  @ApiOperation({ summary: 'List recent test runs across all pipelines' })
+  @ApiResponse({ status: 200, type: [TestRunResponseDto] })
+  async findRecent(): Promise<TestRunResponseDto[]> {
+    const runs = await this.testRunService.findRecent();
+    return runs.map((r) => TestRunResponseDto.fromEntity(r));
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get test run by ID with results' })
   @ApiResponse({ status: 200, type: TestRunResponseDto })

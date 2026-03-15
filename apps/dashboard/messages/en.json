@@ -331,6 +331,10 @@
     "uncoveredFiles": "Uncovered Files",
     "uncoveredLines": "Uncovered lines:"
   },
+  "runs": {
+    "noRuns": "No test runs yet",
+    "noRunsDescription": "Test runs will appear here when you trigger a pipeline."
+  },
   "testRun": {
     "title": "Test Run",
     "stepsCompleted": "{completed} of {total} steps completed",

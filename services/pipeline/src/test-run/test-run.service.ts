@@ -204,6 +204,10 @@ export class TestRunService {
     return this.testRunRepository.findByPipelineId(pipelineId);
   }
 
+  async findRecent(limit = 50): Promise<TestRun[]> {
+    return this.testRunRepository.findRecent(limit);
+  }
+
   async findById(id: string): Promise<TestRun> {
     const run = await this.testRunRepository.findById(id);
     if (!run) {
