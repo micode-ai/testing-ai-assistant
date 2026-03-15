@@ -222,6 +222,38 @@ erDiagram
         string feedback
         datetime createdAt
     }
+
+    Conversation {
+        string id PK
+        string projectId
+        string title
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    ChatMessage {
+        string id PK
+        string conversationId FK
+        string role
+        string content
+        json toolCalls
+        json toolResults
+        string model
+        int tokensUsed
+        datetime createdAt
+    }
+
+    KnowledgeChunk {
+        string id PK
+        string projectId
+        string source
+        string content
+        vector embedding
+        json metadata
+        datetime createdAt
+    }
+
+    Conversation ||--o{ ChatMessage : "has many"
 ```
 
 ### Notification Service
@@ -312,6 +344,18 @@ erDiagram
         string type
     }
 
+    Conversation {
+        string id PK
+        string projectId
+        string title
+    }
+
+    KnowledgeChunk {
+        string id PK
+        string projectId
+        string source
+    }
+
     NotificationConfig {
         string id PK
         string orgId
@@ -324,6 +368,8 @@ erDiagram
     Organization ||--o{ NotificationConfig : "has notification configs"
     Project ||--o{ Pipeline : "has pipelines"
     Project ||--o{ AIGeneration : "has AI generations"
+    Project ||--o{ Conversation : "has conversations"
+    Project ||--o{ KnowledgeChunk : "has knowledge"
     Pipeline ||--o{ TestRun : "has runs"
     TestRun ||--o{ TestResult : "has results"
     TestResult ||--o| CoverageSnapshot : "has coverage"

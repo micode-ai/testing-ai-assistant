@@ -63,6 +63,14 @@ Click on the avatar in the top right corner and select "Sign Out". The token wil
 - **Feedback** — accept or reject with a comment
 - **Statistics** — overall AI generation analytics
 
+### AI Chat
+
+- **Chat interface** — conversational AI assistant for each project
+- **Tool calling** — the AI can create checklists, trigger pipelines, view results
+- **Knowledge base** — answers questions using indexed documentation (RAG)
+- **Conversation history** — past chats are saved and accessible from the sidebar
+- **Streaming responses** — real-time character-by-character response display
+
 ### Code Coverage
 
 - **Coverage snapshots** — coverage percentage per run
@@ -96,9 +104,11 @@ The sidebar contains the main sections:
 2. **Organizations** — organization management
 3. **Projects** — project management
 4. **Pipelines** — test pipelines
-5. **AI** — AI generation and analysis
-6. **Notifications** — notification settings
-7. **Settings** — profile and preferences
+5. **Checklists** — test checklists
+6. **Chat** — AI chat assistant
+7. **AI** — AI generation and analysis
+8. **Notifications** — notification settings
+9. **Settings** — profile and preferences
 
 ## Tips
 

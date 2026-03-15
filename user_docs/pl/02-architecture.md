@@ -4,43 +4,57 @@
 
 Testing AI Assistant jest zbudowany na architekturze mikroserwisowej z komunikacją sterowaną zdarzeniami między serwisami.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          Klienci                                │
-│   ┌──────────────┐              ┌──────────────────┐            │
-│   │  Dashboard    │              │  Aplikacja mob.  │            │
-│   │  (Next.js 15) │              │  (Expo/RN)       │            │
-│   └──────┬───────┘              └────────┬─────────┘            │
-└──────────┼───────────────────────────────┼──────────────────────┘
-           │                               │
-           ▼                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     API Gateway (Traefik)                        │
-│              TLS, routing, rate limiting                         │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-    ┌──────────┬───────────┼───────────┬──────────┬──────────┐
-    ▼          ▼           ▼           ▼          ▼          ▼
-┌────────┐┌────────┐┌──────────┐┌──────────┐┌────────┐┌────────────┐
-│Identity││Organiz.││ Project  ││ Pipeline ││   AI   ││Notification│
-│:3001   ││:3002   ││ :3003    ││ :3004    ││:3005   ││  :3006     │
-└────┬───┘└────┬───┘└────┬─────┘└────┬─────┘└───┬────┘└─────┬──────┘
-     │         │         │           │           │           │
-     ▼         ▼         ▼           ▼           ▼           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                PostgreSQL (osobna baza na serwis)               │
-│  identity_db│ org_db │project_db│pipeline_db│ ai_db │notify_db  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Clients
+        Dashboard["Dashboard<br/>(Next.js 15)"]
+        Mobile["Mobile App<br/>(Expo/RN)"]
+    end
 
-     ┌───────────────────────────────────────────────┐
-     │              Redpanda (Kafka)                  │
-     │       Szyna zdarzeń między serwisami           │
-     └───────────────────────────────────────────────┘
+    subgraph Gateway
+        Traefik["API Gateway<br/>(Traefik)"]
+    end
 
-     ┌──────────────┐  ┌──────────┐  ┌──────────────┐
-     │   Temporal    │  │  Redis   │  │    MinIO      │
-     │  (Workflow)   │  │ (Cache)  │  │ (Magazyn)    │
-     └──────────────┘  └──────────┘  └──────────────┘
+    subgraph Microservices
+        Identity["Identity<br/>:3001"]
+        Organization["Organization<br/>:3002"]
+        Project["Project<br/>:3003"]
+        Pipeline["Pipeline<br/>:3004"]
+        AI["AI<br/>:3005"]
+        Notification["Notification<br/>:3006"]
+    end
+
+    subgraph Databases
+        PG["PostgreSQL<br/>(separate DB per service)"]
+    end
+
+    subgraph Infrastructure
+        Redpanda["Redpanda (Kafka)"]
+        Temporal["Temporal"]
+        Redis["Redis"]
+        MinIO["MinIO"]
+    end
+
+    Dashboard --> Traefik
+    Mobile --> Traefik
+    Traefik --> Identity
+    Traefik --> Organization
+    Traefik --> Project
+    Traefik --> Pipeline
+    Traefik --> AI
+    Traefik --> Notification
+
+    Identity --> PG
+    Organization --> PG
+    Project --> PG
+    Pipeline --> PG
+    AI --> PG
+    Notification --> PG
+
+    Pipeline --> Redpanda
+    Pipeline --> Temporal
+    AI --> Redpanda
+    Notification --> Redpanda
 ```
 
 ## Mikroserwisy
@@ -93,15 +107,17 @@ Zarządzanie pipeline'ami testowymi i przebiegami.
 
 ### AI Service (port 3005)
 
-Generowanie i analiza testów oparta na AI.
+Generowanie i analiza testów oparta na AI oraz asystent konwersacyjny.
 
 - Generowanie testów na podstawie kodu projektu
 - Wykrywanie potencjalnych błędów
 - Wykrywanie niestabilnych testów (flaky tests)
 - Rekomendacje dotyczące poprawy pokrycia
+- **Czat AI z wywoływaniem narzędzi** — interfejs konwersacyjny do akcji na platformie
+- **Baza wiedzy RAG** — odpowiedzi wzbogacone o dokumentację z użyciem embeddingów pgvector
 - Agenty oparte na LangGraph
 
-**Stos technologiczny:** NestJS, Prisma, PostgreSQL, LangChain, LangGraph, OpenAI API
+**Stos technologiczny:** NestJS, Prisma, PostgreSQL + pgvector, LangChain, LangGraph, OpenAI API
 
 ### Notification Service (port 3006)
 
@@ -157,7 +173,7 @@ Silnik wykonywania pipeline'ów testowych.
 
 | Warstwa | Technologie |
 |---------|------------|
-| Backend | NestJS 10, Prisma 5, PostgreSQL 16 |
+| Backend | NestJS 10, Prisma 5, PostgreSQL 16 + pgvector |
 | Frontend Web | Next.js 15, React 19, Tailwind CSS |
 | Frontend Mobile | Expo 52, React Native 0.76 |
 | Broker wiadomości | Redpanda 24.1 (kompatybilny z Kafka) |

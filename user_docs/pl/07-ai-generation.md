@@ -95,6 +95,154 @@ Testy Playwright E2E generowane przez AI z poszczególnych elementów checklisty
 - Generowanie testów E2E do testowania funkcjonalnego
 - Konwersja kryteriów akceptacji na wykonywalne testy
 
+## Asystent czatu AI
+
+AI Service zawiera interfejs konwersacyjnego czatu, który potrafi odpowiadać na pytania i wykonywać akcje na platformie.
+
+### Funkcje
+
+- **Interfejs konwersacyjny** — zadawaj pytania w języku naturalnym
+- **Baza wiedzy RAG** — odpowiedzi wzbogacone o zaindeksowaną dokumentację z `docs/en/` i `user_docs/en/`
+- **Wywoływanie narzędzi** — AI może wykonywać akcje na platformie w Twoim imieniu (szczegóły poniżej)
+- **Historia konwersacji** — konwersacje są zapisywane per projekt i utrzymywane między sesjami
+
+### Dostępne narzędzia
+
+Asystent czatu ma dostęp do 10 narzędzi do interakcji z platformą. Nie musisz wywoływać ich po nazwie — po prostu opisz, co chcesz zrobić, a AI wybierze odpowiednie narzędzie.
+
+#### Projekty
+
+| Narzędzie | Co robi | Przykładowe polecenie |
+|-----------|---------|----------------------|
+| `list_projects` | Zwraca wszystkie dostępne projekty | *„Pokaż moje projekty"* |
+| `list_pipelines` | Zwraca pipeline'y konkretnego projektu | *„Jakie pipeline'y ma ten projekt?"* |
+
+#### Przebiegi testowe
+
+| Narzędzie | Co robi | Przykładowe polecenie |
+|-----------|---------|----------------------|
+| `trigger_pipeline` | Uruchamia nowy przebieg testowy dla pipeline'u. Zwraca utworzony przebieg z ID i statusem. | *„Uruchom pipeline CI"* |
+| `get_run_status` | Pobiera aktualny status, kroki i wyniki przebiegu testowego. | *„Jaki jest status ostatniego przebiegu?"* |
+
+#### Checklisty
+
+| Narzędzie | Co robi | Przykładowe polecenie |
+|-----------|---------|----------------------|
+| `list_checklists` | Zwraca wszystkie checklisty bieżącego projektu | *„Pokaż wszystkie checklisty"* |
+| `create_checklist` | Tworzy nową checklistę z elementami testowymi. Można podać nazwę, opis, docelowy URL i elementy z tytułem, opisem, oczekiwanym zachowaniem i priorytetem (LOW / MEDIUM / HIGH / CRITICAL). | *„Utwórz checklistę do testowania strony logowania z 5 elementami"* |
+| `run_checklist` | Wykonuje checklistę pod docelowym URL. Uruchamia workflow Temporal, który wykonuje każdy element jako test Playwright. | *„Uruchom checklistę logowania na http://localhost:4200"* |
+| `get_checklist_run` | Zwraca wyniki wykonania checklisty — status każdego elementu, podsumowania, zrzuty ekranu. | *„Pokaż wyniki ostatniego uruchomienia checklisty"* |
+
+#### Generowanie AI
+
+| Narzędzie | Co robi | Przykładowe polecenie |
+|-----------|---------|----------------------|
+| `generate_tests` | Uruchamia generowanie AI (TEST_GEN, BUG_DETECT, FLAKY_DETECT, COVERAGE_ADVICE, CHECKLIST_GEN, CHECKLIST_TEST_GEN). Wymaga ID projektu, typu i kontekstu wejściowego. | *„Wygeneruj testy jednostkowe dla tego projektu"* |
+
+#### Baza wiedzy
+
+| Narzędzie | Co robi | Przykładowe polecenie |
+|-----------|---------|----------------------|
+| `search_knowledge` | Wyszukuje w zaindeksowanej dokumentacji za pomocą podobieństwa semantycznego. Zwraca odpowiednie fragmenty dokumentacji. | *„Jak działają webhooki w tej aplikacji?"* |
+
+### Jak działa wywoływanie narzędzi
+
+Gdy wysyłasz wiadomość, AI decyduje, czy potrzebuje użyć narzędzia:
+
+```mermaid
+flowchart TD
+    User["Wysyłasz wiadomość"] --> AI["AI analizuje zapytanie"]
+    AI --> Decision{"Potrzeba wykonać<br/>akcję?"}
+    Decision -- "Nie" --> Reply["AI odpowiada bezpośrednio"]
+    Decision -- "Tak" --> ToolCall["AI wywołuje narzędzie(a)"]
+    ToolCall --> ShowTool["UI pokazuje nazwę + spinner"]
+    ShowTool --> Result["Narzędzie zwraca wynik"]
+    Result --> Process["AI przetwarza wynik"]
+    Process --> Decision
+    Process --> Reply
+
+    style User fill:#3b82f6,color:#fff
+    style Reply fill:#22c55e,color:#fff
+```
+
+W interfejsie czatu:
+- Wywołania narzędzi wyświetlane są jako etykiety z ikoną klucza
+- Podczas działania narzędzia wyświetlany jest spinner
+- Po zakończeniu pojawia się znacznik — kliknij, aby rozwinąć surowy wynik
+- Następnie AI podsumowuje wynik w języku naturalnym
+
+### Przykładowe konwersacje
+
+**Tworzenie i uruchamianie checklisty:**
+> **Ty:** Utwórz checklistę do testowania strony rejestracji
+> **AI:** *(wywołuje `create_checklist`)* Gotowe! Utworzyłem checklistę „Testowanie strony rejestracji" z 8 elementami, w tym walidacja email, siła hasła, obsługa duplikatu email...
+> **Ty:** Uruchom ją na http://localhost:4200
+> **AI:** *(wywołuje `run_checklist`)* Uruchomiono! ID przebiegu checklisty: `abc-123`. Trwa wykonywanie...
+> **Ty:** Jaki jest status?
+> **AI:** *(wywołuje `get_checklist_run`)* 6 z 8 elementów zaliczonych. 2 niezaliczone: „Wskaźnik siły hasła" i „Walidacja checkboxa regulaminu". Szczegóły...
+
+**Pytanie o platformę:**
+> **Ty:** Jak skonfigurować powiadomienia Slack?
+> **AI:** *(wywołuje `search_knowledge`)* Według dokumentacji: przejdź do Ustawienia → Powiadomienia, kliknij „Dodaj konfigurację", wybierz Slack jako kanał, wpisz nazwę kanału (np. #testing-alerts)...
+
+### Użycie przez Dashboard
+
+1. Otwórz projekt → „Czat" w menu bocznym
+2. Wpisz swoje pytanie lub żądanie
+3. AI strumieniowo wyświetla odpowiedź w czasie rzeczywistym
+4. Jeśli AI musi wykonać akcję, pokaże wywołania narzędzi i wyniki
+5. Poprzednie konwersacje są wyświetlone w lewym panelu bocznym
+
+### Użycie przez API
+
+#### Wysłanie wiadomości
+
+```http
+POST /ai/chat
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "message": "Utwórz checklistę do testowania logowania",
+  "projectId": "uuid-projektu",
+  "conversationId": "uuid-konwersacji"
+}
+```
+
+Odpowiedź: strumień SSE ze zdarzeniami typu `text`, `tool_call`, `tool_result`, `done`, `error`.
+
+#### Lista konwersacji
+
+```http
+GET /ai/chat/conversations?projectId=<id>
+Authorization: Bearer <token>
+```
+
+#### Pobranie konwersacji
+
+```http
+GET /ai/chat/conversations/:id
+Authorization: Bearer <token>
+```
+
+#### Usunięcie konwersacji
+
+```http
+DELETE /ai/chat/conversations/:id
+Authorization: Bearer <token>
+```
+
+### Indeksowanie bazy wiedzy
+
+Bazę wiedzy można przeindeksować przez API:
+
+```http
+POST /ai/knowledge/index
+Authorization: Bearer <token>
+```
+
+Endpoint skanuje `docs/en/` i `user_docs/en/`, dzieli dokumenty na fragmenty, generuje embeddingi przez OpenAI i zapisuje je z użyciem pgvector do wyszukiwania podobieństwa.
+
 ## Użytkowanie
 
 ### Przez Dashboard
@@ -179,16 +327,14 @@ OPENAI_MODEL_ADVANCED=o3             # Dla złożonej analizy
 
 AI Service używa LangGraph do orkiestracji agentów:
 
-```
-Żądanie → Router → Agent (LangGraph)
-                        ↓
-               Analiza kodu projektu
-                        ↓
-               Generowanie wyniku
-                        ↓
-               Zapis do bazy danych
-                        ↓
-               Zdarzenie do Redpanda
+```mermaid
+flowchart TD
+    Request["Generation Request"] --> Router{"Generation Type?"}
+    Router --> Agent["LangGraph Agent"]
+    Agent --> Analyze["Analyze project code"]
+    Analyze --> Generate["Generate result"]
+    Generate --> Save["Save to database"]
+    Save --> Event["Emit event to Redpanda"]
 ```
 
 Każdy typ generowania ma wyspecjalizowanego agenta z unikalnym zestawem narzędzi i promptów.

@@ -204,6 +204,38 @@ erDiagram
         string feedback "nullable"
         datetime created_at
     }
+
+    conversations {
+        string id PK "uuid()"
+        string project_id "внешняя ссылка"
+        string title "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+
+    chat_messages {
+        string id PK "uuid()"
+        string conversation_id FK
+        string role "USER | ASSISTANT | SYSTEM | TOOL"
+        text content
+        json tool_calls "nullable"
+        json tool_results "nullable"
+        string model "nullable"
+        int tokens_used "default: 0"
+        datetime created_at
+    }
+
+    knowledge_chunks {
+        string id PK "uuid()"
+        string project_id "nullable, внешняя ссылка"
+        string source
+        text content
+        vector embedding "pgvector"
+        json metadata "nullable"
+        datetime created_at
+    }
+
+    conversations ||--o{ chat_messages : "has"
 ```
 
 ### Notification Service — notify_db
@@ -248,6 +280,8 @@ erDiagram
 
     PROJECT ||--o{ PIPELINE : "has"
     PROJECT ||--o{ AI_GENERATION : "analyzed by"
+    PROJECT ||--o{ CONVERSATION : "has"
+    PROJECT ||--o{ KNOWLEDGE_CHUNK : "has"
 
     PIPELINE ||--o{ TEST_RUN : "triggers"
 

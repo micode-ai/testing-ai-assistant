@@ -232,6 +232,40 @@ http://localhost/api/<service>
 | `PATCH` | `/ai/generations/:id/feedback` | Provide feedback |
 | `GET` | `/ai/generations/stats?projectId=<id>` | Statistics |
 
+### Chat
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/ai/chat` | Send chat message (SSE stream) |
+| `GET` | `/ai/chat/conversations?projectId=<id>` | List conversations |
+| `GET` | `/ai/chat/conversations/:id` | Get conversation with messages |
+| `DELETE` | `/ai/chat/conversations/:id` | Delete conversation |
+
+### Knowledge Base
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/ai/knowledge/index` | Re-index documentation into knowledge base |
+| `GET` | `/ai/knowledge/search?q=<query>&projectId=<id>` | Search knowledge base |
+
+#### POST /ai/chat
+
+```json
+// Request
+{
+  "message": "Create a checklist for login testing",
+  "projectId": "uuid",
+  "conversationId": "uuid-optional"
+}
+
+// Response: SSE stream
+data: {"type":"text","content":"I'll create a checklist...","conversationId":"uuid"}
+data: {"type":"tool_call","content":"{\"name\":\"create_checklist\",\"args\":{...}}","conversationId":"uuid"}
+data: {"type":"tool_result","content":"{\"name\":\"create_checklist\",\"result\":\"{...}\"}","conversationId":"uuid"}
+data: {"type":"text","content":"Done! I've created...","conversationId":"uuid"}
+data: {"type":"done","content":"","conversationId":"uuid"}
+```
+
 #### POST /ai/generate
 
 ```json

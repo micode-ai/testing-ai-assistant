@@ -50,6 +50,7 @@ src/app/
           new/page.tsx                # Create pipeline
           [pipelineId]/page.tsx       # Pipeline details & run history
         coverage/page.tsx             # Coverage dashboard
+        chat/page.tsx                   # AI Chat assistant
         ai/
           page.tsx                    # AI generations list
           generate/page.tsx           # Trigger new generation
@@ -103,6 +104,8 @@ flowchart TD
         ChecklistDetail["/projects/[projectId]/checklists/[checklistId]"]
         ChecklistRunDetail["/checklist-runs/[runId]"]
 
+        Chat["/projects/[projectId]/chat"]
+
         AIList["/projects/[projectId]/ai"]
         AIGenerate["/projects/[projectId]/ai/generate"]
         AIDetail["/projects/[projectId]/ai/[generationId]"]
@@ -124,6 +127,7 @@ flowchart TD
     ProjectDetail --> ProjectSettings
     ProjectDetail --> Pipelines
     ProjectDetail --> Coverage
+    ProjectDetail --> Chat
     ProjectDetail --> AIList
 
     Pipelines --> PipelineNew
@@ -316,6 +320,7 @@ flowchart LR
 | **Artifacts Viewer** | Browse screenshots, videos, and coverage reports from MinIO |
 | **AI Generations** | List of AI generations with accept/reject actions and feedback |
 | **AI Generate** | Form to trigger a new AI generation with type and context selection |
+| **AI Chat** | Conversational AI assistant with tool calling, RAG knowledge base, streaming responses |
 | **Coverage Dashboard** | Line/branch/function coverage charts with historical trends |
 | **Notification Settings** | Configure notification channels per organization and event type |
 

@@ -4,43 +4,57 @@
 
 Testing AI Assistant is built on a microservices architecture with event-driven communication between services.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          Clients                                │
-│   ┌──────────────┐              ┌──────────────────┐            │
-│   │  Dashboard    │              │  Mobile App      │            │
-│   │  (Next.js 15) │              │  (Expo/RN)       │            │
-│   └──────┬───────┘              └────────┬─────────┘            │
-└──────────┼───────────────────────────────┼──────────────────────┘
-           │                               │
-           ▼                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     API Gateway (Traefik)                        │
-│                TLS, routing, rate limiting                       │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-    ┌──────────┬───────────┼───────────┬──────────┬──────────┐
-    ▼          ▼           ▼           ▼          ▼          ▼
-┌────────┐┌────────┐┌──────────┐┌──────────┐┌────────┐┌────────────┐
-│Identity││Organiz.││ Project  ││ Pipeline ││   AI   ││Notification│
-│:3001   ││:3002   ││ :3003    ││ :3004    ││:3005   ││  :3006     │
-└────┬───┘└────┬───┘└────┬─────┘└────┬─────┘└───┬────┘└─────┬──────┘
-     │         │         │           │           │           │
-     ▼         ▼         ▼           ▼           ▼           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   PostgreSQL (separate DB per service)           │
-│  identity_db│ org_db │project_db│pipeline_db│ ai_db │notify_db  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Clients
+        Dashboard["Dashboard<br/>(Next.js 15)"]
+        Mobile["Mobile App<br/>(Expo/RN)"]
+    end
 
-     ┌───────────────────────────────────────────────┐
-     │              Redpanda (Kafka)                  │
-     │        Event bus between services              │
-     └───────────────────────────────────────────────┘
+    subgraph Gateway
+        Traefik["API Gateway<br/>(Traefik)"]
+    end
 
-     ┌──────────────┐  ┌──────────┐  ┌──────────────┐
-     │   Temporal    │  │  Redis   │  │    MinIO      │
-     │  (Workflows)  │  │ (Cache)  │  │  (Storage)   │
-     └──────────────┘  └──────────┘  └──────────────┘
+    subgraph Microservices
+        Identity["Identity<br/>:3001"]
+        Organization["Organization<br/>:3002"]
+        Project["Project<br/>:3003"]
+        Pipeline["Pipeline<br/>:3004"]
+        AI["AI<br/>:3005"]
+        Notification["Notification<br/>:3006"]
+    end
+
+    subgraph Databases
+        PG["PostgreSQL<br/>(separate DB per service)"]
+    end
+
+    subgraph Infrastructure
+        Redpanda["Redpanda (Kafka)"]
+        Temporal["Temporal"]
+        Redis["Redis"]
+        MinIO["MinIO"]
+    end
+
+    Dashboard --> Traefik
+    Mobile --> Traefik
+    Traefik --> Identity
+    Traefik --> Organization
+    Traefik --> Project
+    Traefik --> Pipeline
+    Traefik --> AI
+    Traefik --> Notification
+
+    Identity --> PG
+    Organization --> PG
+    Project --> PG
+    Pipeline --> PG
+    AI --> PG
+    Notification --> PG
+
+    Pipeline --> Redpanda
+    Pipeline --> Temporal
+    AI --> Redpanda
+    Notification --> Redpanda
 ```
 
 ## Microservices
@@ -93,15 +107,17 @@ Test pipeline and run management.
 
 ### AI Service (port 3005)
 
-AI-powered test generation and analysis.
+AI-powered test generation, analysis, and conversational assistant.
 
 - Test generation based on project code
 - Potential bug detection
 - Flaky test detection
 - Coverage improvement recommendations
+- **AI Chat with tool calling** — conversational interface for platform actions
+- **RAG knowledge base** — documentation-aware answers using pgvector embeddings
 - LangGraph-based agents
 
-**Stack:** NestJS, Prisma, PostgreSQL, LangChain, LangGraph, OpenAI API
+**Stack:** NestJS, Prisma, PostgreSQL + pgvector, LangChain, LangGraph, OpenAI API
 
 ### Notification Service (port 3006)
 

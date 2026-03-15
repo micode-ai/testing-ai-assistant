@@ -44,6 +44,7 @@ apps/dashboard/src/app/
     │       │   ├── new/page.tsx         # Создание пайплайна
     │       │   └── [pipelineId]/page.tsx # Детали пайплайна
     │       ├── coverage/page.tsx        # Отчёт о покрытии
+    │       ├── chat/page.tsx           # AI-чат ассистент
     │       └── ai/
     │           ├── page.tsx             # AI-генерации проекта
     │           ├── generate/page.tsx    # Новая генерация
@@ -87,6 +88,8 @@ flowchart TD
         PIP_NEW[/projects/projectId/pipelines/new<br/>Создание пайплайна]
         PIP_DETAIL[/projects/projectId/pipelines/pipelineId<br/>Детали пайплайна]
         PRJ_COVERAGE[/projects/projectId/coverage<br/>Покрытие]
+        PRJ_CHAT[/projects/projectId/chat<br/>AI-чат]
+
         PRJ_AI[/projects/projectId/ai<br/>AI-генерации]
         AI_GEN[/projects/projectId/ai/generate<br/>Новая генерация]
         AI_DETAIL[/projects/projectId/ai/generationId<br/>Детали генерации]
@@ -104,7 +107,7 @@ flowchart TD
     ORGS --> PROJECTS
     PROJECTS --> PRJ_NEW
     PROJECTS --> PRJ_DETAIL
-    PRJ_DETAIL --> PRJ_SETTINGS & PRJ_PIPELINES & PRJ_COVERAGE & PRJ_AI
+    PRJ_DETAIL --> PRJ_SETTINGS & PRJ_PIPELINES & PRJ_COVERAGE & PRJ_CHAT & PRJ_AI
     PRJ_PIPELINES --> PIP_NEW & PIP_DETAIL
     PRJ_AI --> AI_GEN & AI_DETAIL
 
@@ -273,6 +276,13 @@ sequenceDiagram
 - Время выполнения каждого шага
 - Покрытие кода (если собрано)
 - Ссылки на артефакты
+
+### AI Чат (/projects/[projectId]/chat)
+
+- Разговорный AI-ассистент с вызовом инструментов
+- RAG база знаний для контекстных ответов
+- Потоковая передача ответов через SSE
+- Многоходовые беседы с историей
 
 ### AI-генерация (/projects/[projectId]/ai/generate)
 

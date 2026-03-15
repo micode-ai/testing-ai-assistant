@@ -42,6 +42,8 @@
     "projects": "Projekty",
     "runs": "Uruchomienia",
     "coverage": "Pokrycie",
+    "checklists": "Listy kontrolne",
+    "chat": "Czat",
     "ai": "AI",
     "settings": "Ustawienia",
     "notifications": "Powiadomienia",
@@ -436,6 +438,15 @@
     "oauthSignin": "Błąd tworzenia adresu URL autoryzacji.",
     "oauthCallback": "Błąd obsługi odpowiedzi OAuth.",
     "oauthAccountNotLinked": "Ten email jest już powiązany z innym kontem."
+  },
+  "chat": {
+    "newChat": "Nowy czat",
+    "untitled": "Bez tytułu",
+    "welcomeTitle": "Asystent czatu AI",
+    "welcomeSubtitle": "Zadawaj pytania o aplikację, twórz listy kontrolne, uruchamiaj potoki i więcej.",
+    "inputPlaceholder": "Zadaj pytanie...",
+    "result": "wynik",
+    "failedToLoad": "Nie udało się załadować czatu"
   },
   "language": {
     "label": "Język",

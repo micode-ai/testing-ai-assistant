@@ -147,6 +147,12 @@ Gateway prefix: `/api/ai`
 | `GET` | `/ai/generations/stats?projectId=<id>` | Bearer JWT | Get generation statistics |
 | `GET` | `/ai/generations/:id` | Bearer JWT | Get generation details |
 | `PATCH` | `/ai/generations/:id/feedback` | Bearer JWT | Accept/reject with feedback |
+| `POST` | `/ai/chat` | Bearer JWT | Send chat message (SSE stream) |
+| `GET` | `/ai/chat/conversations?projectId=<id>` | Bearer JWT | List conversations |
+| `GET` | `/ai/chat/conversations/:id` | Bearer JWT | Get conversation with messages |
+| `DELETE` | `/ai/chat/conversations/:id` | Bearer JWT | Delete conversation |
+| `POST` | `/ai/knowledge/index` | Bearer JWT | Re-index documentation into knowledge base |
+| `GET` | `/ai/knowledge/search?q=<query>&projectId=<id>` | Bearer JWT | Search knowledge base |
 
 ---
 

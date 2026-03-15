@@ -43,6 +43,7 @@
     "runs": "Запуски",
     "coverage": "Покрытие",
     "checklists": "Чек-листы",
+    "chat": "Чат",
     "ai": "ИИ",
     "settings": "Настройки",
     "notifications": "Уведомления",
@@ -443,6 +444,15 @@
     "oauthSignin": "Ошибка создания URL авторизации.",
     "oauthCallback": "Ошибка обработки OAuth-ответа.",
     "oauthAccountNotLinked": "Этот email уже связан с другим аккаунтом."
+  },
+  "chat": {
+    "newChat": "Новый чат",
+    "untitled": "Без названия",
+    "welcomeTitle": "ИИ Чат-ассистент",
+    "welcomeSubtitle": "Задавайте вопросы о приложении, создавайте чек-листы, запускайте пайплайны и многое другое.",
+    "inputPlaceholder": "Задайте вопрос...",
+    "result": "результат",
+    "failedToLoad": "Не удалось загрузить чат"
   },
   "language": {
     "label": "Язык",

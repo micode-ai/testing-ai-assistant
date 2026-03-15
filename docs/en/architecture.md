@@ -148,6 +148,7 @@ flowchart LR
 | **OpenTelemetry** | Observability | Vendor-neutral telemetry collection for traces, logs, and metrics |
 | **Grafana stack** | Monitoring | Unified visualization for Loki (logs), Tempo (traces), and Prometheus (metrics) |
 | **LangGraph** | AI agents | Stateful multi-step agent graphs with tool use, ideal for complex AI workflows |
+| **pgvector** | Vector similarity | Embedding storage and cosine similarity search for RAG knowledge base |
 
 ## Design Principles
 
