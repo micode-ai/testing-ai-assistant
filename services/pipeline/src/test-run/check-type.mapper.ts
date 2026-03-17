@@ -44,6 +44,13 @@ const PRISMA_TO_WORKFLOW: Record<string, string> = {
   DAST: 'dast',
   DEPENDENCY_AUDIT: 'dep_audit',
   AI_REVIEW: 'ai_review',
+  REPOSITORY_SETUP: 'repository_setup',
+  COVERAGE: 'coverage',
+  // Dashboard check types
+  UNIT_TEST: 'unit',
+  INTEGRATION_TEST: 'integration',
+  E2E_TEST: 'e2e',
+  SECURITY_SCAN: 'sast',
 };
 
 const STATUS_TO_PRISMA: Record<string, string> = {

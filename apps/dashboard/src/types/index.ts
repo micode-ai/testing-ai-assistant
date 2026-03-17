@@ -114,7 +114,97 @@ export interface CoverageSnapshot {
   createdAt: string;
 }
 
-export type GenerationType = 'TEST_GEN' | 'BUG_DETECT' | 'FLAKY_DETECT' | 'COVERAGE_ADVICE';
+export type GenerationType = 'TEST_GEN' | 'BUG_DETECT' | 'FLAKY_DETECT' | 'COVERAGE_ADVICE' | 'PROJECT_ANALYSIS' | 'TEST_PROPOSAL';
+
+export type TestGenSessionStatus =
+  | 'ANALYZING'
+  | 'PROPOSING'
+  | 'AWAITING_APPROVAL'
+  | 'GENERATING'
+  | 'REVIEW'
+  | 'COMMITTING'
+  | 'COMMITTED'
+  | 'FAILED';
+
+export interface TestGenSession {
+  id: string;
+  projectId: string;
+  status: TestGenSessionStatus;
+  profileId: string | null;
+  proposal: TestProposal | null;
+  approvedItems: TestProposalItem[] | null;
+  generatedTests: GeneratedTestFile[] | null;
+  branchName: string | null;
+  commitSha: string | null;
+  commitUrl: string | null;
+  pullRequestUrl: string | null;
+  totalTokensUsed: number;
+  metadata: TestGenProgress | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TestGenProgress {
+  currentTest?: number;
+  totalTests?: number;
+  currentFile?: string;
+  done?: boolean;
+}
+
+export interface TestProposal {
+  items: TestProposalItem[];
+  summary: string;
+  estimatedTokens: number;
+}
+
+export interface TestProposalItem {
+  id: string;
+  targetFile: string;
+  testFilePath: string;
+  testType: 'unit' | 'integration' | 'e2e';
+  description: string;
+  rationale: string;
+  priority: 'high' | 'medium' | 'low';
+  estimatedTests: number;
+}
+
+export interface GeneratedTestFile {
+  path: string;
+  content: string;
+}
+
+export interface ProjectProfile {
+  id: string;
+  projectId: string;
+  language: string;
+  testFramework: string;
+  packageManager: string | null;
+  structure: {
+    sourceDirectories: string[];
+    testDirectories: string[];
+    configFiles: string[];
+    totalFiles: number;
+  };
+  testPatterns: {
+    filePattern: string;
+    existingTests: string[];
+    estimatedCoverage: string;
+  };
+  dependencies: {
+    runtime: string[];
+    devDependencies: string[];
+    testRelated: string[];
+  };
+  analyzedAt: string;
+}
+
+export interface CommitResult {
+  branchName: string;
+  commitSha: string;
+  commitUrl: string;
+  pullRequestUrl?: string;
+}
 
 export interface AIGeneration {
   id: string;

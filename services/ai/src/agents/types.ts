@@ -190,3 +190,75 @@ export interface CoverageRecommendation {
   description: string;
   sampleTestStub: string;
 }
+
+// --- Project Analysis ---
+
+export interface ProjectAnalysisInput extends AgentInput {
+  context: {
+    fileTree: string[];
+    configFiles: Record<string, string>; // path → content
+    existingTestFiles: string[];
+    repoProvider: string;
+  };
+}
+
+export interface ProjectProfile {
+  language: string;
+  testFramework: string;
+  packageManager: string | null;
+  structure: {
+    sourceDirectories: string[];
+    testDirectories: string[];
+    configFiles: string[];
+    totalFiles: number;
+  };
+  testPatterns: {
+    filePattern: string; // e.g. "*.spec.ts", "*.test.js"
+    existingTests: string[];
+    estimatedCoverage: string;
+  };
+  dependencies: {
+    runtime: string[];
+    devDependencies: string[];
+    testRelated: string[];
+  };
+}
+
+// --- Test Proposal ---
+
+export interface TestProposalInput extends AgentInput {
+  context: {
+    profile: ProjectProfile;
+    fileContents: Record<string, string>; // source files to analyze
+    focusArea?: string; // optional user-specified focus
+    recentChanges?: string; // diff or description of recent changes
+    locale?: string; // UI language code (en, ru, pl) for localized output
+  };
+}
+
+export interface TestProposal {
+  items: TestProposalItem[];
+  summary: string;
+  estimatedTokens: number;
+}
+
+export interface TestProposalItem {
+  id: string;
+  targetFile: string;
+  testFilePath: string;
+  testType: 'unit' | 'integration' | 'e2e';
+  description: string;
+  rationale: string;
+  priority: 'high' | 'medium' | 'low';
+  estimatedTests: number;
+}
+
+// --- Approved Test Generation ---
+
+export interface ApprovedTestGenInput extends AgentInput {
+  context: {
+    profile: ProjectProfile;
+    approvedItems: TestProposalItem[];
+    fileContents: Record<string, string>;
+  };
+}

@@ -26,4 +26,20 @@ export class TestGeneratorService {
       throw error;
     }
   }
+
+  /** Fast mode: skip validation/refinement (for batch generation) */
+  async generateFast(input: TestGenInput): Promise<AgentOutput> {
+    this.logger.log(`Generating tests (fast) for project ${input.projectId}`);
+
+    try {
+      const output = await this.agent.runFast(input);
+      this.logger.log(
+        `Test generation (fast) completed: tokens=${output.tokensUsed}, model=${output.model}`,
+      );
+      return output;
+    } catch (error) {
+      this.logger.error(`Test generation (fast) failed: ${(error as Error).message}`, (error as Error).stack);
+      throw error;
+    }
+  }
 }
