@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
-import { Sparkles, TestTube, Bug, RotateCcw, ShieldCheck, Loader2 } from 'lucide-react';
+import { Sparkles, TestTube, Bug, RotateCcw, ShieldCheck, Loader2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -115,6 +115,28 @@ export default function AIHubPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Smart Test Generator */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="flex items-center justify-between py-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-primary/10 p-3">
+              <Wand2 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold">{t('testWizard.smartGenerator')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('testWizard.smartGeneratorDesc')}
+              </p>
+            </div>
+          </div>
+          <Button asChild>
+            <Link href={`/projects/${projectId}/ai/test-wizard`}>
+              {t('testWizard.startWizard')}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <div className="space-y-4">

@@ -18,6 +18,8 @@ import { FlakyDetectorService } from '../agents/flaky-detector/flaky-detector.se
 import { CoverageAdvisorService } from '../agents/coverage-advisor/coverage-advisor.service';
 import { ChecklistGeneratorService } from '../agents/checklist-generator/checklist-generator.service';
 import { ChecklistTestGeneratorService } from '../agents/checklist-test-generator/checklist-test-generator.service';
+import { ProjectAnalyzerService } from '../agents/project-analyzer/project-analyzer.service';
+import { TestProposerService } from '../agents/test-proposer/test-proposer.service';
 import { AgentOutput } from '../agents/types';
 
 @Injectable()
@@ -33,6 +35,8 @@ export class GenerationService {
     private readonly coverageAdvisorService: CoverageAdvisorService,
     private readonly checklistGeneratorService: ChecklistGeneratorService,
     private readonly checklistTestGeneratorService: ChecklistTestGeneratorService,
+    private readonly projectAnalyzerService: ProjectAnalyzerService,
+    private readonly testProposerService: TestProposerService,
   ) {}
 
   async create(dto: CreateGenerationDto): Promise<GenerationEntity> {
@@ -141,6 +145,10 @@ export class GenerationService {
         return this.checklistGeneratorService.generate(input as any);
       case GenerationType.CHECKLIST_TEST_GEN:
         return this.checklistTestGeneratorService.generate(input as any);
+      case GenerationType.PROJECT_ANALYSIS:
+        return this.projectAnalyzerService.analyze(input as any);
+      case GenerationType.TEST_PROPOSAL:
+        return this.testProposerService.propose(input as any);
       default:
         throw new BadRequestException(`Unsupported generation type: ${type}`);
     }
