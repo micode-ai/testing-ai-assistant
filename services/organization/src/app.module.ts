@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { OrganizationModule } from './organization/organization.module';
 import { MembershipModule } from './membership/membership.module';
+import { ProviderTokenModule } from './provider-token/provider-token.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 
 @Module({
@@ -25,6 +26,7 @@ import { JwtStrategy } from './common/strategies/jwt.strategy';
     HealthModule,
     OrganizationModule,
     MembershipModule,
+    ProviderTokenModule,
   ],
   providers: [JwtStrategy],
 })

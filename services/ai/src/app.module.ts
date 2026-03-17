@@ -9,6 +9,7 @@ import { GenerationModule } from './generation/generation.module';
 import { AgentsModule } from './agents/agents.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { ChatModule } from './chat/chat.module';
+import { TestGenSessionModule } from './test-gen-session/test-gen-session.module';
 import { JwtStrategy } from './common/strategies/jwt.strategy';
 
 @Module({
@@ -32,6 +33,7 @@ import { JwtStrategy } from './common/strategies/jwt.strategy';
     AgentsModule,
     KnowledgeModule,
     ChatModule,
+    TestGenSessionModule,
   ],
   providers: [JwtStrategy],
 })

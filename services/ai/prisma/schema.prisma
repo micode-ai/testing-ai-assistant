@@ -17,23 +17,76 @@ enum GenerationType {
   COVERAGE_ADVICE
   CHECKLIST_GEN
   CHECKLIST_TEST_GEN
+  PROJECT_ANALYSIS
+  TEST_PROPOSAL
+}
+
+enum TestGenSessionStatus {
+  ANALYZING
+  PROPOSING
+  AWAITING_APPROVAL
+  GENERATING
+  REVIEW
+  COMMITTING
+  COMMITTED
+  FAILED
 }
 
 model AIGeneration {
-  id            String   @id @default(uuid())
-  projectId     String   @map("project_id")
-  type          GenerationType
-  inputContext  Json     @map("input_context")
-  output        String   @db.Text
-  model         String
-  tokensUsed    Int      @default(0) @map("tokens_used")
-  accepted      Boolean?
-  feedback      String?
-  createdAt     DateTime @default(now()) @map("created_at")
+  id           String         @id @default(uuid())
+  projectId    String         @map("project_id")
+  type         GenerationType
+  inputContext Json           @map("input_context")
+  output       String         @db.Text
+  model        String
+  tokensUsed   Int            @default(0) @map("tokens_used")
+  accepted     Boolean?
+  feedback     String?
+  createdAt    DateTime       @default(now()) @map("created_at")
 
   @@index([projectId])
   @@index([type])
   @@map("ai_generations")
+}
+
+model ProjectProfile {
+  id             String   @id @default(uuid())
+  projectId      String   @unique @map("project_id")
+  language       String
+  testFramework  String   @map("test_framework")
+  packageManager String?  @map("package_manager")
+  structure      Json // file tree summary, key directories
+  testPatterns   Json?    @map("test_patterns") // existing test file patterns
+  dependencies   Json? // key dependencies
+  analyzedAt     DateTime @map("analyzed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@map("project_profiles")
+}
+
+model TestGenSession {
+  id              String               @id @default(uuid())
+  projectId       String               @map("project_id")
+  status          TestGenSessionStatus
+  profileId       String?              @map("profile_id")
+  proposal        Json? // proposed tests
+  approvedItems   Json?                @map("approved_items") // user-approved subset
+  generatedTests  Json?                @map("generated_tests") // { path, content }[]
+  branchName      String?              @map("branch_name")
+  commitSha       String?              @map("commit_sha")
+  commitUrl       String?              @map("commit_url")
+  pullRequestUrl  String?              @map("pull_request_url")
+  totalTokensUsed Int                  @default(0) @map("total_tokens_used")
+  metadata        Json?                // progress info, etc.
+  error           String?
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([status])
+  @@map("test_gen_sessions")
 }
 
 model Conversation {
@@ -51,7 +104,7 @@ model Conversation {
 model ChatMessage {
   id             String       @id @default(uuid())
   conversationId String       @map("conversation_id")
-  role           String       // "user" | "assistant" | "tool"
+  role           String // "user" | "assistant" | "tool"
   content        String       @db.Text
   toolCalls      Json?        @map("tool_calls")
   toolResults    Json?        @map("tool_results")
@@ -65,13 +118,13 @@ model ChatMessage {
 }
 
 model KnowledgeChunk {
-  id        String                  @id @default(uuid())
-  projectId String?                 @map("project_id")
+  id        String                 @id @default(uuid())
+  projectId String?                @map("project_id")
   source    String
-  content   String                  @db.Text
+  content   String                 @db.Text
   embedding Unsupported("vector")?
-  metadata  Json                    @default("{}")
-  createdAt DateTime                @default(now()) @map("created_at")
+  metadata  Json                   @default("{}")
+  createdAt DateTime               @default(now()) @map("created_at")
 
   @@index([projectId])
   @@map("knowledge_chunks")

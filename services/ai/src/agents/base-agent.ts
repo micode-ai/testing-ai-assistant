@@ -7,10 +7,12 @@ export abstract class BaseAgent {
   protected fastModel: ChatOpenAI;
 
   constructor(configService: ConfigService) {
+    const advancedModel = configService.get('OPENAI_MODEL_ADVANCED', 'o3');
     this.model = new ChatOpenAI({
-      modelName: configService.get('OPENAI_MODEL_ADVANCED', 'o3'),
+      modelName: advancedModel,
       openAIApiKey: configService.get('OPENAI_API_KEY'),
-      temperature: 0.2,
+      // o3/o4-mini reasoning models don't support temperature
+      ...(advancedModel.startsWith('o') ? {} : { temperature: 0.2 }),
     });
     this.fastModel = new ChatOpenAI({
       modelName: configService.get('OPENAI_MODEL_FAST', 'gpt-4.1-mini'),

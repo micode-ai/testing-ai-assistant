@@ -5,6 +5,8 @@ import { FlakyDetectorService } from './flaky-detector/flaky-detector.service';
 import { CoverageAdvisorService } from './coverage-advisor/coverage-advisor.service';
 import { ChecklistGeneratorService } from './checklist-generator/checklist-generator.service';
 import { ChecklistTestGeneratorService } from './checklist-test-generator/checklist-test-generator.service';
+import { ProjectAnalyzerService } from './project-analyzer/project-analyzer.service';
+import { TestProposerService } from './test-proposer/test-proposer.service';
 
 @Module({
   providers: [
@@ -14,6 +16,8 @@ import { ChecklistTestGeneratorService } from './checklist-test-generator/checkl
     CoverageAdvisorService,
     ChecklistGeneratorService,
     ChecklistTestGeneratorService,
+    ProjectAnalyzerService,
+    TestProposerService,
   ],
   exports: [
     TestGeneratorService,
@@ -22,6 +26,8 @@ import { ChecklistTestGeneratorService } from './checklist-test-generator/checkl
     CoverageAdvisorService,
     ChecklistGeneratorService,
     ChecklistTestGeneratorService,
+    ProjectAnalyzerService,
+    TestProposerService,
   ],
 })
 export class AgentsModule {}

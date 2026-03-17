@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Github, GitlabIcon, Check, Plus, X } from 'lucide-react';
 import { createOrgSchema, type CreateOrgInput } from '@/lib/validations/organization';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,16 @@ export default function OrgSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Integrations state
+  const [providerTokens, setProviderTokens] = useState<Array<{
+    id: string; provider: string; label: string | null; hasToken: boolean;
+  }>>([]);
+  const [addingProvider, setAddingProvider] = useState<string | null>(null);
+  const [newToken, setNewToken] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [savingToken, setSavingToken] = useState(false);
+  const [tokenMessage, setTokenMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
 
   const fetchOrg = useCallback(async () => {
@@ -62,9 +72,66 @@ export default function OrgSettingsPage() {
     }
   }, [orgId, token]);
 
+  const fetchTokens = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${ORG_API_URL}/organizations/${orgId}/provider-tokens`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setProviderTokens(await res.json());
+      }
+    } catch { /* ignore */ }
+  }, [orgId, token]);
+
   useEffect(() => {
     fetchOrg();
-  }, [fetchOrg]);
+    fetchTokens();
+  }, [fetchOrg, fetchTokens]);
+
+  async function handleSaveToken(provider: string) {
+    if (!newToken.trim()) return;
+    setSavingToken(true);
+    setTokenMessage(null);
+    try {
+      const res = await fetch(`${ORG_API_URL}/organizations/${orgId}/provider-tokens`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, token: newToken.trim(), label: newLabel.trim() || undefined }),
+      });
+      if (res.ok) {
+        setTokenMessage({ type: 'success', text: t('tokenSaved') });
+        setAddingProvider(null);
+        setNewToken('');
+        setNewLabel('');
+        await fetchTokens();
+      } else {
+        setTokenMessage({ type: 'error', text: t('failedToSaveToken') });
+      }
+    } catch {
+      setTokenMessage({ type: 'error', text: t('failedToSaveToken') });
+    } finally {
+      setSavingToken(false);
+    }
+  }
+
+  async function handleRemoveToken(provider: string) {
+    setTokenMessage(null);
+    try {
+      const res = await fetch(`${ORG_API_URL}/organizations/${orgId}/provider-tokens/${provider}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setTokenMessage({ type: 'success', text: t('tokenRemoved') });
+        await fetchTokens();
+      } else {
+        setTokenMessage({ type: 'error', text: t('failedToRemoveToken') });
+      }
+    } catch {
+      setTokenMessage({ type: 'error', text: t('failedToRemoveToken') });
+    }
+  }
 
   const {
     register,
@@ -187,6 +254,152 @@ export default function OrgSettingsPage() {
             {isSaving ? tc('saving') : tc('save')}
           </Button>
         </CardFooter>
+      </Card>
+
+      <Separator />
+
+      {/* Integrations */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('integrations')}</CardTitle>
+          <CardDescription>{t('integrationsDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {tokenMessage && (
+            <div className={`rounded-md p-3 text-sm ${
+              tokenMessage.type === 'success'
+                ? 'bg-green-500/10 text-green-700'
+                : 'bg-destructive/10 text-destructive'
+            }`}>
+              {tokenMessage.text}
+            </div>
+          )}
+
+          {/* Provider list */}
+          {(['GITHUB', 'GITLAB', 'BITBUCKET'] as const).map((provider) => {
+            const existing = providerTokens.find((t) => t.provider === provider);
+            const isAdding = addingProvider === provider;
+            const Icon = provider === 'GITHUB' ? Github : provider === 'GITLAB' ? GitlabIcon : Github;
+            const providerName = provider === 'GITHUB' ? 'GitHub' : provider === 'GITLAB' ? 'GitLab' : 'Bitbucket';
+
+            return (
+              <div key={provider} className="rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-5 w-5" />
+                    <div>
+                      <p className="font-medium text-sm">{providerName}</p>
+                      {existing && (
+                        <p className="text-xs text-muted-foreground">
+                          {existing.label || t('tokenConnected')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {existing ? (
+                      <>
+                        <span className="flex items-center gap-1 text-xs text-green-600">
+                          <Check className="h-3 w-3" />
+                          {t('tokenConnected')}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveToken(provider)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setAddingProvider(isAdding ? null : provider);
+                            setNewToken('');
+                            setNewLabel(existing.label || '');
+                          }}
+                        >
+                          {isAdding ? tc('cancel') : t('addToken')}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setAddingProvider(isAdding ? null : provider);
+                          setNewToken('');
+                          setNewLabel('');
+                        }}
+                      >
+                        {isAdding ? tc('cancel') : <><Plus className="mr-1 h-3 w-3" /> {t('addToken')}</>}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {isAdding && (
+                  <div className="mt-3 space-y-3 border-t pt-3">
+                    {/* Provider-specific instructions */}
+                    <div className="rounded-md bg-muted/50 p-3 space-y-1">
+                      {provider === 'GITHUB' && (
+                        <>
+                          <p className="text-xs text-muted-foreground">{t('githubHint1')}</p>
+                          <p className="text-xs text-muted-foreground">{t('githubHint2')}</p>
+                          <p className="text-xs text-muted-foreground">{t('githubHint3')}</p>
+                          <p className="text-xs text-muted-foreground">{t('githubHint4')}</p>
+                          <p className="text-xs text-muted-foreground">{t('githubHint5')}</p>
+                        </>
+                      )}
+                      {provider === 'GITLAB' && (
+                        <>
+                          <p className="text-xs text-muted-foreground">{t('gitlabHint1')}</p>
+                          <p className="text-xs text-muted-foreground">{t('gitlabHint2')}</p>
+                          <p className="text-xs text-muted-foreground">{t('gitlabHint3')}</p>
+                          <p className="text-xs text-muted-foreground">{t('gitlabHint4')}</p>
+                          <p className="text-xs text-muted-foreground">{t('gitlabHint5')}</p>
+                        </>
+                      )}
+                      {provider === 'BITBUCKET' && (
+                        <>
+                          <p className="text-xs text-muted-foreground">{t('bitbucketHint1')}</p>
+                          <p className="text-xs text-muted-foreground">{t('bitbucketHint2')}</p>
+                          <p className="text-xs text-muted-foreground">{t('bitbucketHint3')}</p>
+                          <p className="text-xs text-muted-foreground">{t('bitbucketHint4')}</p>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>{t('providerToken')}</Label>
+                      <Input
+                        type="password"
+                        value={newToken}
+                        onChange={(e) => setNewToken(e.target.value)}
+                        placeholder={t('providerTokenPlaceholder')}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{t('providerLabel')}</Label>
+                      <Input
+                        value={newLabel}
+                        onChange={(e) => setNewLabel(e.target.value)}
+                        placeholder={t('providerLabelPlaceholder')}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleSaveToken(provider)}
+                      disabled={savingToken || !newToken.trim()}
+                    >
+                      {savingToken ? tc('saving') : t('addToken')}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
       </Card>
 
       <Separator />

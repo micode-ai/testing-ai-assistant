@@ -25,9 +25,12 @@ export class TestGeneratorAgent extends BaseAgent {
   private readonly logger = new Logger(TestGeneratorAgent.name);
   private graph: ReturnType<StateGraph<typeof TestGenAnnotation>['compile']>;
 
+  private graphFast: ReturnType<StateGraph<typeof TestGenAnnotation>['compile']>;
+
   constructor(configService: ConfigService) {
     super(configService);
     this.graph = this.buildGraph();
+    this.graphFast = this.buildFastGraph();
   }
 
   private buildGraph() {
@@ -50,7 +53,31 @@ export class TestGeneratorAgent extends BaseAgent {
     return workflow.compile() as any;
   }
 
+  /** Fast graph: analyze → generate → format (no validation/refinement) */
+  private buildFastGraph() {
+    const workflow = new StateGraph(TestGenAnnotation)
+      .addNode('analyzeCode', this.analyzeCode.bind(this))
+      .addNode('generateTests', this.generateTests.bind(this))
+      .addNode('formatOutput', this.formatOutput.bind(this))
+      .addEdge(START, 'analyzeCode')
+      .addEdge('analyzeCode', 'generateTests')
+      .addEdge('generateTests', 'formatOutput')
+      .addEdge('formatOutput', END);
+
+    return workflow.compile() as any;
+  }
+
   async run(input: TestGenInput): Promise<AgentOutput> {
+    return this.execute(input, this.graph);
+  }
+
+  /** Fast mode: skip validation/refinement (for batch generation) */
+  async runFast(input: TestGenInput): Promise<AgentOutput> {
+    this.logger.log(`Running FAST test generator for project ${input.projectId}`);
+    return this.execute(input, this.graphFast);
+  }
+
+  private async execute(input: TestGenInput, graph: any): Promise<AgentOutput> {
     this.logger.log(`Running test generator for project ${input.projectId}`);
 
     const initialState: Partial<TestGenGraphState> = {
@@ -64,7 +91,7 @@ export class TestGeneratorAgent extends BaseAgent {
       tokensUsed: 0,
     };
 
-    const result = await this.graph.invoke(initialState);
+    const result = await graph.invoke(initialState);
 
     return {
       result: result.finalOutput,
@@ -77,6 +104,12 @@ export class TestGeneratorAgent extends BaseAgent {
     this.logger.debug('Analyzing code changes...');
 
     const { context } = state.input;
+    const codeDiff = context.codeDiff || (context as any).diff || '';
+    const fileContents = context.fileContents || {};
+    const existingTests = context.existingTests || [];
+    const testFramework = context.testFramework || 'jest';
+    const language = context.language || 'typescript';
+
     const response = await this.model.invoke([
       new SystemMessage(
         'You are an expert test engineer. Analyze the following code changes and determine what tests are needed. ' +
@@ -84,11 +117,11 @@ export class TestGeneratorAgent extends BaseAgent {
         'Output a structured analysis of what tests should be written.',
       ),
       new HumanMessage(
-        `Code Diff:\n${context.codeDiff}\n\n` +
-        `File Contents:\n${JSON.stringify(context.fileContents, null, 2)}\n\n` +
-        `Existing Tests:\n${context.existingTests.join('\n')}\n\n` +
-        `Test Framework: ${context.testFramework}\n` +
-        `Language: ${context.language}`,
+        `Code Diff:\n${codeDiff}\n\n` +
+        `File Contents:\n${JSON.stringify(fileContents, null, 2)}\n\n` +
+        `Existing Tests:\n${existingTests.join('\n')}\n\n` +
+        `Test Framework: ${testFramework}\n` +
+        `Language: ${language}`,
       ),
     ]);
 
@@ -105,18 +138,24 @@ export class TestGeneratorAgent extends BaseAgent {
     this.logger.debug('Generating test code...');
 
     const { context } = state.input;
+    const codeDiff = context.codeDiff || (context as any).diff || '';
+    const fileContents = context.fileContents || {};
+    const existingTests = context.existingTests || [];
+    const testFramework = context.testFramework || 'jest';
+    const language = context.language || 'typescript';
+
     const response = await this.model.invoke([
       new SystemMessage(
         'You are an expert test engineer. Based on the analysis provided, generate complete, runnable test code. ' +
-        `Use the ${context.testFramework} framework. Write tests in ${context.language}. ` +
+        `Use the ${testFramework} framework. Write tests in ${language}. ` +
         'Include proper imports, setup/teardown, meaningful test names, and comprehensive assertions. ' +
         'Output ONLY the test code, no explanations.',
       ),
       new HumanMessage(
         `Analysis:\n${state.analysis}\n\n` +
-        `Code Diff:\n${context.codeDiff}\n\n` +
-        `File Contents:\n${JSON.stringify(context.fileContents, null, 2)}\n\n` +
-        `Existing Tests:\n${context.existingTests.join('\n')}`,
+        `Code Diff:\n${codeDiff}\n\n` +
+        `File Contents:\n${JSON.stringify(fileContents, null, 2)}\n\n` +
+        `Existing Tests:\n${existingTests.join('\n')}`,
       ),
     ]);
 
@@ -163,7 +202,7 @@ export class TestGeneratorAgent extends BaseAgent {
   }
 
   private shouldRefine(state: TestGenGraphState): 'refine' | 'done' {
-    if (!state.validationResult.valid && state.refinementCount < 3) {
+    if (!state.validationResult.valid && state.refinementCount < 1) {
       return 'refine';
     }
     return 'done';

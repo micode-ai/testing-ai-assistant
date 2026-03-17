@@ -36,11 +36,35 @@ model Organization {
   slug String @unique
   plan OrgPlan @default(FREE)
 
-  memberships OrgMembership[]
+  memberships    OrgMembership[]
+  providerTokens ProviderToken[]
 
   @@index([deletedAt])
   @@index([slug])
   @@map("organizations")
+}
+
+enum RepoProvider {
+  GITHUB
+  GITLAB
+  BITBUCKET
+}
+
+model ProviderToken {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  orgId    String       @map("org_id")
+  provider RepoProvider
+  token    String       @db.Text
+  label    String?      // e.g. "Main GitHub Bot", for user reference
+
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([orgId, provider])
+  @@index([orgId])
+  @@map("provider_tokens")
 }
 
 model OrgMembership {
