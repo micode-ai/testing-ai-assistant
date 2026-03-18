@@ -12,6 +12,7 @@ import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 import { GenerationEntity } from './entities/generation.entity';
 import { GenerationStatsDto } from './dto/generation-response.dto';
 import { GenerationCompletedEvent } from './events/generation-completed.event';
+import { PrismaService } from '../prisma/prisma.service';
 import { TestGeneratorService } from '../agents/test-generator/test-generator.service';
 import { BugDetectorService } from '../agents/bug-detector/bug-detector.service';
 import { FlakyDetectorService } from '../agents/flaky-detector/flaky-detector.service';
@@ -37,6 +38,7 @@ export class GenerationService {
     private readonly checklistTestGeneratorService: ChecklistTestGeneratorService,
     private readonly projectAnalyzerService: ProjectAnalyzerService,
     private readonly testProposerService: TestProposerService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async create(dto: CreateGenerationDto): Promise<GenerationEntity> {
@@ -110,18 +112,37 @@ export class GenerationService {
   async getStats(projectId: string): Promise<GenerationStatsDto> {
     const stats = await this.generationRepository.getStatsByProjectId(projectId);
 
+    // Also aggregate TestGenSession data
+    const [sessionCount, sessionTokensAgg, committedCount] = await Promise.all([
+      this.prisma.testGenSession.count({ where: { projectId } }),
+      this.prisma.testGenSession.aggregate({
+        where: { projectId },
+        _sum: { totalTokensUsed: true },
+      }),
+      this.prisma.testGenSession.count({ where: { projectId, status: 'COMMITTED' } }),
+    ]);
+
+    const sessionTokens = sessionTokensAgg._sum.totalTokensUsed || 0;
+
     const byType: Record<string, number> = {};
     for (const entry of stats.byType) {
       byType[entry.type] = entry._count;
     }
+    if (sessionCount > 0) {
+      byType['TEST_GEN_SESSION'] = sessionCount;
+    }
+
+    const totalGenerations = stats.total + sessionCount;
+    const acceptedCount = stats.accepted + committedCount;
+    const totalReviewed = acceptedCount + stats.rejected;
 
     return {
-      totalGenerations: stats.total,
+      totalGenerations,
       byType,
-      acceptedCount: stats.accepted,
+      acceptedCount,
       rejectedCount: stats.rejected,
-      pendingCount: stats.pending,
-      totalTokensUsed: stats.totalTokens,
+      pendingCount: stats.pending + (sessionCount - committedCount),
+      totalTokensUsed: stats.totalTokens + sessionTokens,
     };
   }
 

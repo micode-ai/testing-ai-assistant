@@ -345,3 +345,200 @@ Each generation type has a specialized agent with a unique set of tools and prom
 - **Use feedback** — this helps improve generation quality
 - **Start with TEST_GENERATION** — this is the most mature generation type
 - **Combine with manual coverage** — AI supplements, not replaces, manual tests
+
+## Smart Test Generator Wizard
+
+The Smart Test Generator is a guided, multi-step workflow that analyzes your project repository and generates production-quality test files using AI. It connects directly to your Git provider, understands your project structure and conventions, and produces tests that follow your existing patterns.
+
+### What It Does
+
+- Scans your repository to detect language, framework, test patterns, and project structure
+- Analyzes source files and proposes which tests to create, with descriptions and priority levels
+- Lets you choose which proposed tests to generate
+- Generates complete, runnable test files with correct imports and mocking patterns
+- Validates generated code locally (TypeScript type checking and ESLint) and auto-fixes errors
+- Lets you review and edit every generated test before committing
+- Creates a dedicated branch and optionally opens a pull request
+
+### Prerequisites
+
+Before using the wizard, you need a **provider token** configured for your organization:
+
+1. Navigate to **Organization Settings** in the sidebar
+2. Go to the **Integrations** tab
+3. Click **Add Provider Token**
+4. Select your Git provider (GitHub, GitLab, or Bitbucket)
+5. Paste a personal access token or app token with the following permissions:
+   - **GitHub**: `repo` scope (full repository access)
+   - **GitLab**: `api` scope
+   - **Bitbucket**: Repository read and write permissions
+6. Save the token
+
+The token is shared across all projects in the organization. Any organization member can use the wizard once a token is configured.
+
+### Step-by-Step Walkthrough
+
+#### Step 1: Start a Session
+
+Open a project, navigate to the **AI** tab, and click **Generate Tests**. The system creates a new session and begins analyzing your repository.
+
+During analysis, the system:
+- Fetches your repository's file tree
+- Reads configuration files (package.json, tsconfig.json, jest.config.ts, etc.)
+- Identifies existing test files and their patterns
+- Uses AI to build a structured profile of your project (language, framework, directory layout, dependencies)
+
+This typically takes 5--15 seconds. The analysis result is cached, so subsequent sessions for the same project skip re-analysis.
+
+#### Step 2: Review the Proposal
+
+Once analysis completes, click **Generate Proposal** (or it may proceed automatically). You can optionally specify a **focus area** (e.g., "authentication module", "data transformers") to guide the AI.
+
+The AI examines up to 30 source files and produces a list of proposed test files. Each proposal item includes:
+
+- **Target file**: The source file to be tested
+- **Test file path**: Where the test file will be created (follows your existing naming conventions)
+- **Test type**: Unit, integration, or E2E
+- **Description**: What the tests will cover
+- **Rationale**: Why these tests are valuable
+- **Priority**: High (critical logic, no existing tests), Medium (important but partially covered), or Low (nice to have)
+- **Estimated test count**: How many individual test cases will be generated
+
+#### Step 3: Approve Items
+
+Review the proposal and select which tests you want to generate. You can select all items or pick specific ones. High-priority items are highlighted.
+
+Click **Approve & Generate** to proceed.
+
+#### Step 4: Generation
+
+The AI generates test code for each approved item. This runs in the background; you can see real-time progress:
+
+- Which file is being generated (e.g., "2 of 5")
+- The current phase for each file: collecting context, analyzing, generating, post-processing, LLM review
+
+For each test file, the system:
+1. Fetches the target source file and its local imports (types, interfaces, utilities)
+2. Fetches up to 3 existing test files as style examples
+3. Computes correct relative import paths from the test file to source files
+4. Calls the AI to generate the test code
+5. Strips markdown formatting, removes unused imports/variables, fixes common type issues
+6. Runs a second AI pass to review and fix import paths and type errors
+
+#### Step 5: Validation
+
+After all tests are generated, the system validates them automatically:
+
+1. Clones your repository into a temporary directory
+2. Installs dependencies (detects pnpm/yarn/npm automatically)
+3. Copies generated test files into the clone
+4. Runs `tsc --noEmit` to check for TypeScript errors
+5. Runs ESLint to check for linting violations
+6. If errors are found, sends them to the AI for correction and re-validates (up to 3 attempts)
+
+You can **skip validation** at any time if you prefer to fix issues manually.
+
+#### Step 6: Review
+
+All generated tests are displayed in an editor view. You can:
+
+- **Read the code** for each generated test file
+- **Edit** any test file directly in the browser
+- **Regenerate** individual tests that do not meet your expectations (sends them back through the generation pipeline while preserving all other tests)
+
+Take your time in this step. The session remains in `REVIEW` status until you commit or cancel.
+
+#### Step 7: Commit
+
+When you are satisfied with the tests:
+
+1. Optionally customize the **commit message** (a sensible default is provided)
+2. Optionally check **Create Pull Request** to open a PR automatically
+3. Click **Commit**
+
+The system:
+- Creates a branch named `ai/test-gen-{timestamp}` from your default branch
+- Commits all generated test files in a single commit
+- If requested, opens a pull request with a summary listing all generated files and the session ID
+
+You will receive links to the commit and the pull request (if created).
+
+### Managing Sessions
+
+#### Resuming a Session
+
+Sessions persist across browser sessions. If you close the page during generation or review, simply return to the project's AI tab and the session list will show your in-progress sessions. Click on a session to resume from wherever it stopped.
+
+#### Cancelling a Session
+
+You can cancel a session at any point before it reaches a terminal state (COMMITTED, CANCELLED, or FAILED). Cancelling during generation stops the process after the current file finishes. Already-generated tests are preserved in the session record but are not committed.
+
+#### Regenerating Tests
+
+From the review step, you can select individual tests to regenerate without starting over. This is useful when:
+
+- A specific test has incorrect mocking patterns
+- You want to try a different testing approach for one file
+- The AI missed an important edge case
+
+You can also regenerate from an already-committed session to improve specific tests and commit again.
+
+#### Session History
+
+The AI tab shows recent sessions for the current project (up to 20). You can view past sessions to see what was generated, review commit links, or re-generate from a previous session's proposal.
+
+### Tips and Best Practices
+
+1. **Set a focus area** when generating proposals. A targeted proposal (e.g., "services layer" or "utility functions") produces better results than analyzing the entire codebase.
+
+2. **Start with high-priority items**. Approve 3-5 high-priority tests first, review the quality, then do additional rounds if satisfied.
+
+3. **Review the project profile** after the first analysis. If the detected framework or patterns look wrong, re-run analysis or adjust your project configuration.
+
+4. **Check import paths carefully**. The system computes relative imports automatically, but complex monorepo path aliases (e.g., `@app/shared`) may need manual correction.
+
+5. **Use existing tests as examples**. The generator reads up to 3 of your existing test files to match style. If your repo has well-structured test examples, the output quality improves significantly.
+
+6. **Do not skip validation unless you have a reason**. The tsc + eslint validation catches real issues that would fail in CI. The auto-fix loop resolves most problems automatically.
+
+7. **Always create a PR** rather than committing directly. This lets your team review the AI-generated tests in the normal code review workflow.
+
+8. **Token usage**: Each session consumes LLM tokens. The session detail view shows `totalTokensUsed`. A typical 5-file generation uses roughly 30,000-60,000 tokens depending on source file complexity.
+
+### Troubleshooting
+
+**"No GITHUB token configured for this organization"**
+An organization admin needs to add a provider token in Organization Settings > Integrations. See Prerequisites above.
+
+**Session stuck in ANALYZING**
+The system may be waiting for the Git provider API. Large repositories (10,000+ files) take longer. If it stays for more than 60 seconds, check that the provider token has sufficient permissions and the repository URL is correct.
+
+**Validation fails repeatedly**
+Some projects have complex build configurations that the validator cannot replicate in an isolated clone (e.g., custom Webpack loaders, code generation steps). Click "Skip Validation" and fix any issues after committing.
+
+**Generated tests have wrong import paths**
+This happens most often in monorepos with TypeScript path aliases (e.g., `paths` in `tsconfig.json`). The system uses relative paths, not aliases. You can edit the imports in the review step, or configure `tsconfig.json` `paths` to match relative layouts.
+
+**"Project not found" error**
+The AI service fetches project metadata from the Project service via an internal API. Ensure both services are running and `PROJECT_SERVICE_URL` is configured correctly.
+
+**Tests reference types or functions that do not exist**
+The AI occasionally hallucinates interface properties or function signatures. Review generated mock objects against your actual source code. The LLM validation pass catches most of these, but complex types may slip through.
+
+**Generation is slow**
+Each test file involves 2-3 LLM calls (analyze, generate, validate). For 10 approved items, expect 3-5 minutes. The system processes files sequentially to manage API rate limits and context quality. You can cancel and commit a partial result from the review step.
+
+### Supported Languages and Frameworks
+
+The wizard has been tested with:
+
+| Language    | Frameworks                          |
+|-------------|-------------------------------------|
+| TypeScript  | Jest, Vitest, Mocha, Playwright     |
+| JavaScript  | Jest, Vitest, Mocha                 |
+| Python      | pytest                              |
+| Java        | JUnit                               |
+| Go          | testing (standard library)          |
+| Rust        | cargo test                          |
+
+Best results are achieved with TypeScript/JavaScript projects using Jest or Vitest, as these have the most sophisticated import resolution and validation support.

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
-import { Sparkles, TestTube, Bug, RotateCcw, ShieldCheck, Loader2, Wand2 } from 'lucide-react';
+import { Sparkles, TestTube, Bug, RotateCcw, ShieldCheck, Loader2, Wand2, CheckCircle2, Clock, AlertCircle, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -17,9 +17,9 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
-import { getGenerations, getGenerationStats } from '@/lib/api/ai';
+import { getGenerations, getGenerationStats, getTestGenSessions, cancelSession } from '@/lib/api/ai';
 import { PageSkeleton } from '@/components/shared/page-skeleton';
-import type { AIGeneration, GenerationStats } from '@/types';
+import type { AIGeneration, GenerationStats, TestGenSession, TestProposal } from '@/types';
 
 export default function AIHubPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -27,6 +27,7 @@ export default function AIHubPage() {
   const t = useTranslations();
   const [stats, setStats] = useState<GenerationStats | null>(null);
   const [generations, setGenerations] = useState<AIGeneration[]>([]);
+  const [sessions, setSessions] = useState<TestGenSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,12 +37,14 @@ export default function AIHubPage() {
     if (!token) return;
     async function load() {
       try {
-        const [statsData, generationsData] = await Promise.all([
+        const [statsData, generationsData, sessionsData] = await Promise.all([
           getGenerationStats(projectId, token),
           getGenerations(projectId, undefined, token),
+          getTestGenSessions(projectId, token),
         ]);
         setStats(statsData);
         setGenerations(generationsData);
+        setSessions(sessionsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : t('aiHub.failedToLoad'));
       } finally {
@@ -78,7 +81,7 @@ export default function AIHubPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t('aiHub.totalGenerations')}</CardDescription>
-            <CardTitle className="text-4xl">{stats?.total ?? 0}</CardTitle>
+            <CardTitle className="text-4xl">{stats?.totalGenerations ?? 0}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
@@ -91,7 +94,9 @@ export default function AIHubPage() {
           <CardHeader className="pb-2">
             <CardDescription>{t('aiHub.acceptanceRate')}</CardDescription>
             <CardTitle className="text-4xl">
-              {stats ? `${Math.round(stats.acceptanceRate * 100)}%` : '0%'}
+              {stats && stats.acceptedCount + stats.rejectedCount > 0
+                ? `${Math.round((stats.acceptedCount / (stats.acceptedCount + stats.rejectedCount)) * 100)}%`
+                : '0%'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -105,7 +110,7 @@ export default function AIHubPage() {
           <CardHeader className="pb-2">
             <CardDescription>{t('aiHub.tokensUsed')}</CardDescription>
             <CardTitle className="text-4xl">
-              {stats?.totalTokens?.toLocaleString() ?? 0}
+              {stats?.totalTokensUsed?.toLocaleString() ?? 0}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -168,6 +173,84 @@ export default function AIHubPage() {
           </Button>
         </div>
       </div>
+
+      {/* Test Gen Sessions */}
+      {sessions.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">{t('testWizard.pastSessions')}</h3>
+          <div className="space-y-2">
+            {sessions.map((s) => {
+              const proposalCount = (s.proposal as TestProposal | null)?.items?.length || 0;
+              const generatedCount = s.generatedTests?.length || 0;
+              const remaining = proposalCount - generatedCount;
+
+              const statusIcon = s.status === 'COMMITTED'
+                ? <CheckCircle2 className="h-4 w-4 text-green-600" />
+                : s.status === 'FAILED'
+                  ? <AlertCircle className="h-4 w-4 text-red-600" />
+                  : ['ANALYZING', 'GENERATING', 'VALIDATING', 'PROPOSING'].includes(s.status)
+                    ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    : <Clock className="h-4 w-4 text-muted-foreground" />;
+
+              const isActive = !['COMMITTED', 'CANCELLED', 'FAILED'].includes(s.status);
+
+              return (
+                <Card key={s.id} className="transition-colors hover:bg-accent/50">
+                  <CardContent className="flex items-center justify-between py-4">
+                    <Link
+                      href={`/projects/${projectId}/ai/test-wizard?session=${s.id}`}
+                      className="flex items-center gap-3 flex-1 min-w-0"
+                    >
+                      {statusIcon}
+                      <div>
+                        <p className="text-sm font-medium">
+                          {new Date(s.createdAt).toLocaleDateString()} — {s.status}
+                        </p>
+                        <div className="flex gap-3 text-xs text-muted-foreground">
+                          <span>{s.totalTokensUsed.toLocaleString()} {t('common.tokens')}</span>
+                          {generatedCount > 0 && (
+                            <span>{t('testWizard.generatedItems', { count: generatedCount })}</span>
+                          )}
+                          {remaining > 0 && (
+                            <span className="text-yellow-600">{t('testWizard.remainingItems', { count: remaining })}</span>
+                          )}
+                          {s.commitSha && (
+                            <span className="text-green-600 font-mono">{s.commitSha.slice(0, 7)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                    <div className="flex items-center gap-2">
+                      {isActive && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            await cancelSession(s.id, token);
+                            const updated = await getTestGenSessions(projectId, token);
+                            setSessions(updated);
+                          }}
+                        >
+                          <Square className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Badge variant="outline">
+                        {s.status === 'COMMITTED' ? t('testWizard.steps.commit')
+                          : s.status === 'CANCELLED' ? t('testWizard.cancelSession')
+                          : s.status === 'REVIEW' ? t('testWizard.steps.review')
+                          : s.status === 'AWAITING_APPROVAL' ? t('testWizard.steps.approve')
+                          : s.status}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent Generations */}
       <div className="space-y-4">

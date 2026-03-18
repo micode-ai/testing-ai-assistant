@@ -45,6 +45,10 @@ export class GitAdapterFactory {
     }
   }
 
+  async getOrgToken(orgId: string, provider: RepoProvider): Promise<string> {
+    return this.fetchOrgToken(orgId, provider);
+  }
+
   private async fetchOrgToken(orgId: string, provider: RepoProvider): Promise<string> {
     const url = `${this.orgServiceUrl}/api/v1/provider-tokens?orgId=${orgId}&provider=${provider}`;
 

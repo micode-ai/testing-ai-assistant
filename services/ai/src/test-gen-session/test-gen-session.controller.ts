@@ -16,6 +16,7 @@ import {
   ApproveProposalDto,
   UpdateTestsDto,
   CommitTestsDto,
+  RegenerateTestsDto,
 } from './dto/start-session.dto';
 
 @Controller('ai/test-gen-sessions')
@@ -67,6 +68,30 @@ export class TestGenSessionController {
   @Patch(':id/tests')
   async updateTests(@Param('id') id: string, @Body() dto: UpdateTestsDto) {
     return this.sessionService.updateGeneratedTests(id, dto.tests);
+  }
+
+  /**
+   * Regenerate specific tests (by proposal item IDs) within an existing session.
+   */
+  @Post(':id/regenerate')
+  async regenerateTests(
+    @Param('id') id: string,
+    @Body() dto: RegenerateTestsDto,
+  ) {
+    return this.sessionService.startRegeneration(id, dto.itemIds);
+  }
+
+  /**
+   * Skip validation and move directly to REVIEW.
+   */
+  @Post(':id/cancel')
+  async cancelSession(@Param('id') id: string) {
+    return this.sessionService.cancelSession(id);
+  }
+
+  @Post(':id/skip-validation')
+  async skipValidation(@Param('id') id: string) {
+    return this.sessionService.skipValidation(id);
   }
 
   @Post(':id/commit')

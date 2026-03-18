@@ -121,9 +121,11 @@ export type TestGenSessionStatus =
   | 'PROPOSING'
   | 'AWAITING_APPROVAL'
   | 'GENERATING'
+  | 'VALIDATING'
   | 'REVIEW'
   | 'COMMITTING'
   | 'COMMITTED'
+  | 'CANCELLED'
   | 'FAILED';
 
 export interface TestGenSession {
@@ -150,6 +152,13 @@ export interface TestGenProgress {
   totalTests?: number;
   currentFile?: string;
   done?: boolean;
+  phase?: string;
+  step?: string; // substep: collecting_context, analyzing, post_processing, llm_review
+  validationAttempt?: number;
+  maxAttempts?: number;
+  errorCount?: number;
+  validationPassed?: boolean;
+  validationError?: string;
 }
 
 export interface TestProposal {
@@ -220,10 +229,12 @@ export interface AIGeneration {
 }
 
 export interface GenerationStats {
-  total: number;
-  byType: Record<GenerationType, number>;
-  acceptanceRate: number;
-  totalTokens: number;
+  totalGenerations: number;
+  byType: Record<string, number>;
+  acceptedCount: number;
+  rejectedCount: number;
+  pendingCount: number;
+  totalTokensUsed: number;
 }
 
 export type NotificationChannel = 'EMAIL' | 'SLACK' | 'TELEGRAM';

@@ -202,6 +202,41 @@ export async function updateGeneratedTests(
   );
 }
 
+export async function cancelSession(
+  sessionId: string,
+  token?: string,
+): Promise<{ status: string; sessionId: string }> {
+  return aiClient<{ status: string; sessionId: string }>(
+    `/ai/test-gen-sessions/${sessionId}/cancel`,
+    { method: 'POST', token },
+  );
+}
+
+export async function skipValidation(
+  sessionId: string,
+  token?: string,
+): Promise<{ status: string; sessionId: string }> {
+  return aiClient<{ status: string; sessionId: string }>(
+    `/ai/test-gen-sessions/${sessionId}/skip-validation`,
+    { method: 'POST', token },
+  );
+}
+
+export async function regenerateTests(
+  sessionId: string,
+  itemIds: string[],
+  token?: string,
+): Promise<{ status: string; sessionId: string; itemCount: number }> {
+  return aiClient<{ status: string; sessionId: string; itemCount: number }>(
+    `/ai/test-gen-sessions/${sessionId}/regenerate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ itemIds }),
+      token,
+    },
+  );
+}
+
 export async function commitTests(
   sessionId: string,
   options: { createPR?: boolean; commitMessage?: string } = {},

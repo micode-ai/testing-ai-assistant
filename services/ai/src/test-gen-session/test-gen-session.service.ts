@@ -17,6 +17,9 @@ import {
   TestProposal,
   TestProposalItem,
 } from '../agents/types';
+import { cleanGeneratedTest } from './test-cleanup.util';
+import { LocalValidatorService } from './local-validator.service';
+import { formatErrorsForLLM } from './validation-error-parser.util';
 
 interface ProjectInfo {
   id: string;
@@ -41,6 +44,7 @@ export class TestGenSessionService {
     private readonly testProposerService: TestProposerService,
     private readonly testGeneratorService: TestGeneratorService,
     private readonly gitAdapterFactory: GitAdapterFactory,
+    private readonly localValidator: LocalValidatorService,
     private readonly configService: ConfigService,
   ) {
     this.projectServiceUrl = this.configService.get<string>(
@@ -296,6 +300,47 @@ export class TestGenSessionService {
     return { status: 'GENERATING', sessionId };
   }
 
+  /**
+   * Regenerate specific items (new or existing) within a completed session.
+   * Sets status to GENERATING, runs generation for selected items, then validates.
+   */
+  async startRegeneration(sessionId: string, itemIds: string[]) {
+    const session = await this.getSession(sessionId);
+
+    // Allow regeneration from REVIEW, COMMITTED, or AWAITING_APPROVAL states
+    const allowedStatuses = ['REVIEW', 'COMMITTED', 'AWAITING_APPROVAL'];
+    if (!allowedStatuses.includes(session.status as string)) {
+      throw new BadRequestException(
+        `Cannot regenerate from status ${session.status}. Allowed: ${allowedStatuses.join(', ')}`,
+      );
+    }
+
+    const proposal = session.proposal as unknown as TestProposal;
+    if (!proposal?.items) {
+      throw new BadRequestException('No proposal found in session');
+    }
+
+    // Find items to regenerate
+    const selectedItems = proposal.items.filter((item) => itemIds.includes(item.id));
+    if (selectedItems.length === 0) {
+      throw new BadRequestException('No matching items found');
+    }
+
+    // Update session: set approved items to the selected ones, status to GENERATING
+    await this.sessionRepo.update(sessionId, {
+      approvedItems: selectedItems as any,
+      status: 'GENERATING',
+      metadata: { phase: 'regenerating', itemCount: selectedItems.length } as any,
+    });
+
+    // Fire async
+    this.generateApprovedTests(sessionId).catch((err) => {
+      this.logger.error(`Regeneration failed for session ${sessionId}: ${err.message}`);
+    });
+
+    return { status: 'GENERATING', sessionId, itemCount: selectedItems.length };
+  }
+
   async generateApprovedTests(sessionId: string) {
     const session = await this.getSession(sessionId);
     if (session.status !== 'GENERATING') {
@@ -323,6 +368,7 @@ export class TestGenSessionService {
       const project = await this.fetchProjectInfo(session.projectId);
       const adapter = await this.createAdapter(project);
 
+      // Fetch all target files + gather import paths
       const targetFiles = [...new Set(approvedItems.map((i) => i.targetFile))];
       const fileContents = await adapter.getMultipleFiles(
         project.repoOwner,
@@ -336,6 +382,36 @@ export class TestGenSessionService {
         fileContentsMap[file.path] = file.content;
       }
 
+      // Extract local imports from all target files and fetch them
+      const importPaths = this.extractImportPaths(fileContentsMap, targetFiles);
+      if (importPaths.length > 0) {
+        const importContents = await adapter.getMultipleFiles(
+          project.repoOwner,
+          project.repoName,
+          project.defaultBranch,
+          importPaths.slice(0, 20), // limit to 20 imported files
+        );
+        for (const file of importContents) {
+          fileContentsMap[file.path] = file.content;
+        }
+      }
+
+      // Fetch existing test files as style examples (up to 3)
+      const existingTestFiles = (profile.testPatterns as any)?.existingTests || [];
+      const exampleTests: string[] = [];
+      if (existingTestFiles.length > 0) {
+        const sampleTestPaths = existingTestFiles.slice(0, 3);
+        const testContents = await adapter.getMultipleFiles(
+          project.repoOwner,
+          project.repoName,
+          project.defaultBranch,
+          sampleTestPaths,
+        );
+        for (const file of testContents) {
+          exampleTests.push(`// Example from ${file.path}:\n${file.content.slice(0, 2000)}`);
+        }
+      }
+
       const generatedTests: Array<{ path: string; content: string }> = [];
       let totalTokens = 0;
       const totalItems = approvedItems.length;
@@ -343,47 +419,131 @@ export class TestGenSessionService {
       for (let i = 0; i < approvedItems.length; i++) {
         const item = approvedItems[i];
 
-        // Update progress
         await this.sessionRepo.update(sessionId, {
           metadata: {
             currentTest: i + 1,
             totalTests: totalItems,
             currentFile: item.testFilePath,
+            phase: 'generating',
           } as any,
         });
 
+        // Check if cancelled
+        const currentSession = await this.sessionRepo.findById(sessionId);
+        if (currentSession?.status === 'CANCELLED') {
+          this.logger.log(`Session ${sessionId} was cancelled, stopping generation`);
+          return generatedTests;
+        }
+
+        const updateProgress = async (step: string) => {
+          await this.sessionRepo.update(sessionId, {
+            metadata: {
+              currentTest: i + 1,
+              totalTests: totalItems,
+              currentFile: item.testFilePath,
+              phase: 'generating',
+              step,
+            } as any,
+          });
+        };
+
         this.logger.log(`Generating test ${i + 1}/${totalItems}: ${item.testFilePath}`);
 
+        // Step 1: Collecting context
+        await updateProgress('collecting_context');
+        const targetContent = fileContentsMap[item.targetFile] || '';
+        const relatedImports = this.getRelatedImports(targetContent, fileContentsMap, item.targetFile);
+
+        const contextFiles: Record<string, string> = {
+          [item.targetFile]: targetContent,
+          ...relatedImports,
+        };
+
+        const importMap = Object.keys(contextFiles).reduce(
+          (acc, filePath) => {
+            acc[filePath] = this.calculateRelativeImport(item.testFilePath, filePath);
+            return acc;
+          },
+          {} as Record<string, string>,
+        );
+
+        const importInstructions =
+          `IMPORT PATHS (use these EXACT paths in your imports):\n` +
+          Object.entries(importMap)
+            .map(([file, relPath]) => `  ${file} → import from '${relPath}'`)
+            .join('\n');
+
+        // Step 2: AI analyzing code
+        await updateProgress('analyzing');
         const agentOutput = await this.testGeneratorService.generateFast({
           projectId: session.projectId,
           context: {
-            codeDiff: '',
-            fileContents: { [item.targetFile]: fileContentsMap[item.targetFile] || '' },
-            existingTests: [],
+            codeDiff: importInstructions,
+            fileContents: contextFiles,
+            existingTests: exampleTests,
             testFramework: profile.testFramework,
             language: profile.language,
           },
         });
 
+        // Step 3: Post-processing
+        await updateProgress('post_processing');
         let testCode = agentOutput.result;
         testCode = testCode.replace(/^```(?:typescript|javascript|python|java|ts|js)?\n?/m, '');
         testCode = testCode.replace(/\n?```\s*$/m, '');
+        testCode = cleanGeneratedTest(testCode);
+        testCode = this.fixImportPaths(testCode, importMap);
+        totalTokens += agentOutput.tokensUsed;
+
+        // Step 4: LLM validation pass
+        await updateProgress('llm_review');
+        const validatedCode = await this.validateAndFix(
+          testCode,
+          contextFiles,
+          item.testFilePath,
+          importMap,
+          session.projectId,
+        );
+        if (validatedCode.tokensUsed > 0) {
+          totalTokens += validatedCode.tokensUsed;
+        }
 
         generatedTests.push({
           path: item.testFilePath,
-          content: testCode,
+          content: validatedCode.code,
         });
-        totalTokens += agentOutput.tokensUsed;
-        await this.sessionRepo.addTokens(sessionId, agentOutput.tokensUsed);
+        await this.sessionRepo.addTokens(sessionId, totalTokens);
       }
+
+      // Merge with existing tests (for regeneration: replace matched, keep others)
+      const existingTests = (session.generatedTests as unknown as Array<{ path: string; content: string }>) || [];
+      const newTestPaths = new Set(generatedTests.map((t) => t.path));
+      const mergedTests = [
+        ...existingTests.filter((t) => !newTestPaths.has(t.path)),
+        ...generatedTests,
+      ];
+
+      // --- Validation phase ---
+      await this.sessionRepo.update(sessionId, {
+        status: 'VALIDATING',
+        generatedTests: mergedTests as any,
+        metadata: { phase: 'cloning', totalTests: totalItems } as any,
+      });
+
+      const validatedTests = await this.runLocalValidation(
+        sessionId,
+        mergedTests,
+        project,
+        profile,
+      );
 
       await this.sessionRepo.update(sessionId, {
         status: 'REVIEW',
-        generatedTests: generatedTests as any,
-        metadata: { currentTest: totalItems, totalTests: totalItems, done: true } as any,
+        generatedTests: validatedTests as any,
+        metadata: { currentTest: totalItems, totalTests: totalItems, done: true, validationPassed: true } as any,
       });
 
-      return generatedTests;
+      return validatedTests;
     } catch (error) {
       await this.sessionRepo.update(sessionId, {
         status: 'FAILED',
@@ -394,6 +554,36 @@ export class TestGenSessionService {
   }
 
   // --- Step 5: Update generated tests (user edits) ---
+
+  async cancelSession(sessionId: string) {
+    const session = await this.getSession(sessionId);
+    const terminalStatuses = ['COMMITTED', 'CANCELLED', 'FAILED'];
+    if (terminalStatuses.includes(session.status as string)) {
+      throw new BadRequestException(`Session is already in terminal status: ${session.status}`);
+    }
+
+    await this.sessionRepo.update(sessionId, {
+      status: 'CANCELLED',
+      metadata: { cancelledAt: new Date().toISOString(), previousStatus: session.status } as any,
+    });
+
+    this.logger.log(`Session ${sessionId} cancelled from status ${session.status}`);
+    return { status: 'CANCELLED', sessionId };
+  }
+
+  async skipValidation(sessionId: string) {
+    const session = await this.getSession(sessionId);
+    if (session.status !== 'VALIDATING' && session.status !== 'GENERATING') {
+      throw new BadRequestException(`Cannot skip validation from status ${session.status}`);
+    }
+
+    await this.sessionRepo.update(sessionId, {
+      status: 'REVIEW',
+      metadata: { phase: 'validation_skipped', validationPassed: false } as any,
+    });
+
+    return { status: 'REVIEW', sessionId };
+  }
 
   async updateGeneratedTests(
     sessionId: string,
@@ -538,4 +728,339 @@ export class TestGenSessionService {
     }
     return response.json() as Promise<ProjectInfo>;
   }
+
+  /**
+   * Extract local import paths from source files and resolve them to repo paths.
+   */
+  /**
+   * Calculate relative import path from a test file to a source file.
+   * e.g., test: "src/agents/__tests__/router.test.ts", source: "src/agents/router.agent.ts"
+   * → "../router.agent"
+   */
+  private calculateRelativeImport(fromFile: string, toFile: string): string {
+    const fromParts = fromFile.split('/').slice(0, -1); // directory of test file
+    const toParts = toFile.split('/');
+    const toFileName = toParts.pop()!;
+    const toDir = toParts;
+
+    // Find common prefix length
+    let common = 0;
+    while (common < fromParts.length && common < toDir.length && fromParts[common] === toDir[common]) {
+      common++;
+    }
+
+    const ups = fromParts.length - common;
+    const downs = toDir.slice(common);
+
+    const prefix = ups === 0 ? './' : '../'.repeat(ups);
+    const path = [...downs, toFileName.replace(/\.(ts|tsx|js|jsx)$/, '')].join('/');
+
+    return prefix + path;
+  }
+
+  /**
+   * Programmatically fix import paths in generated test code.
+   * Replaces wrong relative paths with correct ones based on the import map.
+   */
+  private fixImportPaths(code: string, importMap: Record<string, string>): string {
+    let result = code;
+
+    for (const [filePath, correctImport] of Object.entries(importMap)) {
+      // Extract the filename without extension for matching
+      const baseName = filePath.split('/').pop()!.replace(/\.(ts|tsx|js|jsx)$/, '');
+
+      // Match any import from a path ending with this filename
+      const importRegex = new RegExp(
+        `(from\\s+['"])([^'"]*\\/${escapeRegexStr(baseName)}|\\.\\.?\\/[^'"]*${escapeRegexStr(baseName)})(['"])`,
+        'g',
+      );
+
+      result = result.replace(importRegex, `$1${correctImport}$3`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate generated test code and fix issues using fast LLM.
+   */
+  private async validateAndFix(
+    testCode: string,
+    contextFiles: Record<string, string>,
+    testFilePath: string,
+    importMap: Record<string, string>,
+    projectId: string,
+  ): Promise<{ code: string; tokensUsed: number }> {
+    const contextSummary = Object.entries(contextFiles)
+      .map(([path, content]) => {
+        // Extract exports from source files
+        const exports = content.match(/export\s+(class|interface|type|function|const|enum|async function)\s+(\w+)/g) || [];
+        return `File: ${path} (import as '${importMap[path] || path}')\n  Exports: ${exports.join(', ') || 'default export'}`;
+      })
+      .join('\n');
+
+    const validationPrompt =
+      `Review this test file for TypeScript/ESLint errors and fix ALL issues.\n\n` +
+      `Test file location: ${testFilePath}\n\n` +
+      `Available source files and their exports:\n${contextSummary}\n\n` +
+      `Import path mapping (use EXACT paths):\n${Object.entries(importMap).map(([f, p]) => `  ${f} → '${p}'`).join('\n')}\n\n` +
+      `RULES:\n` +
+      `- Fix ALL incorrect import paths using the mapping above\n` +
+      `- Remove any unused imports or variables\n` +
+      `- Ensure all mock return values match the actual function return types\n` +
+      `- Ensure all required interface properties are included in mock objects\n` +
+      `- Do NOT use @ts-expect-error or @ts-ignore\n` +
+      `- Do NOT use NodeJS global types directly\n` +
+      `- Output ONLY the corrected test code, nothing else\n\n` +
+      `Test code to fix:\n\`\`\`typescript\n${testCode}\n\`\`\``;
+
+    try {
+      const { HumanMessage, SystemMessage } = await import('@langchain/core/messages');
+      const { ChatOpenAI } = await import('@langchain/openai');
+      const { ConfigService } = await import('@nestjs/config');
+
+      // Use the existing fast model from the test generator service
+      const response = await this.testGeneratorService.generateFast({
+        projectId,
+        context: {
+          codeDiff: validationPrompt,
+          fileContents: contextFiles,
+          existingTests: [],
+          testFramework: 'jest',
+          language: 'typescript',
+        },
+      });
+
+      let fixedCode = response.result;
+      fixedCode = fixedCode.replace(/^```(?:typescript|javascript|ts|js)?\n?/m, '');
+      fixedCode = fixedCode.replace(/\n?```\s*$/m, '');
+      fixedCode = cleanGeneratedTest(fixedCode);
+      fixedCode = this.fixImportPaths(fixedCode, importMap);
+
+      return { code: fixedCode, tokensUsed: response.tokensUsed };
+    } catch (error) {
+      this.logger.warn(`Validation pass failed, using original code: ${(error as Error).message}`);
+      return { code: testCode, tokensUsed: 0 };
+    }
+  }
+
+  /**
+   * Clone repo locally, run tsc + eslint on generated tests.
+   * If errors found, feed them to LLM and retry up to 3 times.
+   */
+  private async runLocalValidation(
+    sessionId: string,
+    tests: Array<{ path: string; content: string }>,
+    project: ProjectInfo,
+    profile: ProjectProfile,
+  ): Promise<Array<{ path: string; content: string }>> {
+    let currentTests = [...tests];
+    const maxAttempts = 3;
+
+    try {
+      const token = await this.gitAdapterFactory.getOrgToken(
+        project.orgId,
+        project.repoProvider as RepoProvider,
+      );
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        // Check if cancelled
+        const currentSession = await this.sessionRepo.findById(sessionId);
+        if (currentSession?.status === 'CANCELLED') {
+          this.logger.log(`Session ${sessionId} was cancelled, stopping validation`);
+          return currentTests;
+        }
+
+        this.logger.log(`Validation attempt ${attempt}/${maxAttempts}`);
+
+        const result = await this.localValidator.validate({
+          repoUrl: project.repoUrl,
+          branch: project.defaultBranch,
+          token,
+          provider: project.repoProvider as 'GITHUB' | 'GITLAB' | 'BITBUCKET',
+          packageManager: profile.packageManager,
+          tests: currentTests,
+          onProgress: (phase) => {
+            this.sessionRepo.update(sessionId, {
+              metadata: {
+                phase,
+                validationAttempt: attempt,
+                maxAttempts,
+              } as any,
+            }).catch(() => {});
+          },
+        });
+
+        if (result.valid) {
+          this.logger.log(`Validation passed on attempt ${attempt}`);
+          await this.sessionRepo.update(sessionId, {
+            metadata: {
+              phase: 'validation_passed',
+              validationAttempt: attempt,
+              maxAttempts,
+            } as any,
+          });
+          return currentTests;
+        }
+
+        this.logger.log(`Validation found ${result.errors.length} error(s), attempt ${attempt}/${maxAttempts}`);
+
+        if (attempt >= maxAttempts) {
+          this.logger.warn(`Validation failed after ${maxAttempts} attempts, proceeding with best effort`);
+          await this.sessionRepo.update(sessionId, {
+            metadata: {
+              phase: 'validation_failed',
+              validationAttempt: attempt,
+              maxAttempts,
+              errorCount: result.errors.length,
+              validationPassed: false,
+            } as any,
+          });
+          return currentTests;
+        }
+
+        // Fix errors with LLM
+        await this.sessionRepo.update(sessionId, {
+          metadata: {
+            phase: 'fixing',
+            validationAttempt: attempt,
+            maxAttempts,
+            errorCount: result.errors.length,
+          } as any,
+        });
+
+        // Group errors by file
+        const errorsByFile = new Map<string, typeof result.errors>();
+        for (const err of result.errors) {
+          const normalizedFile = currentTests.find(
+            (t) => err.file.endsWith(t.path) || err.file === t.path,
+          )?.path || err.file;
+          if (!errorsByFile.has(normalizedFile)) {
+            errorsByFile.set(normalizedFile, []);
+          }
+          errorsByFile.get(normalizedFile)!.push(err);
+        }
+
+        // Fix each file with errors
+        for (const testFile of currentTests) {
+          const fileErrors = errorsByFile.get(testFile.path);
+          if (!fileErrors || fileErrors.length === 0) continue;
+
+          const errorPrompt = formatErrorsForLLM(fileErrors, testFile.content);
+
+          try {
+            const fixOutput = await this.testGeneratorService.generateFast({
+              projectId: project.id,
+              context: {
+                codeDiff: errorPrompt,
+                fileContents: { [testFile.path]: testFile.content },
+                existingTests: [],
+                testFramework: profile.testFramework,
+                language: profile.language,
+              },
+            });
+
+            let fixedCode = fixOutput.result;
+            fixedCode = fixedCode.replace(/^```(?:typescript|javascript|ts|js)?\n?/m, '');
+            fixedCode = fixedCode.replace(/\n?```\s*$/m, '');
+            fixedCode = cleanGeneratedTest(fixedCode);
+
+            testFile.content = fixedCode;
+            await this.sessionRepo.addTokens(sessionId, fixOutput.tokensUsed);
+          } catch (err) {
+            this.logger.warn(`Failed to fix ${testFile.path}: ${(err as Error).message}`);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`Local validation failed, proceeding without validation: ${(error as Error).message}`);
+      await this.sessionRepo.update(sessionId, {
+        metadata: {
+          phase: 'validation_skipped',
+          validationError: (error as Error).message,
+        } as any,
+      });
+    }
+
+    return currentTests;
+  }
+
+  private extractImportPaths(
+    fileContentsMap: Record<string, string>,
+    targetFiles: string[],
+  ): string[] {
+    const importPaths = new Set<string>();
+    const importRegex = /from\s+['"](\.[^'"]+)['"]/g;
+
+    for (const targetFile of targetFiles) {
+      const content = fileContentsMap[targetFile];
+      if (!content) continue;
+
+      const dir = targetFile.split('/').slice(0, -1).join('/');
+      let match: RegExpExecArray | null;
+
+      while ((match = importRegex.exec(content)) !== null) {
+        const importPath = match[1];
+        const resolved = this.resolveImportPath(dir, importPath);
+        if (resolved) importPaths.add(resolved);
+      }
+    }
+
+    // Remove files we already have
+    for (const existing of Object.keys(fileContentsMap)) {
+      importPaths.delete(existing);
+    }
+
+    return Array.from(importPaths);
+  }
+
+  /**
+   * Resolve a relative import to possible file paths.
+   */
+  private resolveImportPath(dir: string, importPath: string): string | null {
+    // Normalize: ./foo or ../foo
+    const parts = [...dir.split('/'), ...importPath.split('/')].filter(Boolean);
+    const resolved: string[] = [];
+    for (const part of parts) {
+      if (part === '.') continue;
+      if (part === '..') { resolved.pop(); continue; }
+      resolved.push(part);
+    }
+    const base = resolved.join('/');
+
+    // Try common extensions
+    const extensions = ['.ts', '.tsx', '.js', '.jsx'];
+    for (const ext of extensions) {
+      return `${base}${ext}`;
+    }
+    return `${base}.ts`;
+  }
+
+  /**
+   * Get imported files' content for a given source file.
+   */
+  private getRelatedImports(
+    sourceContent: string,
+    allFiles: Record<string, string>,
+    sourceFile: string,
+  ): Record<string, string> {
+    const result: Record<string, string> = {};
+    const importRegex = /from\s+['"](\.[^'"]+)['"]/g;
+    const dir = sourceFile.split('/').slice(0, -1).join('/');
+
+    let match: RegExpExecArray | null;
+    while ((match = importRegex.exec(sourceContent)) !== null) {
+      const importPath = match[1];
+      const resolved = this.resolveImportPath(dir, importPath);
+      if (resolved && allFiles[resolved]) {
+        result[resolved] = allFiles[resolved];
+      }
+    }
+
+    return result;
+  }
+}
+
+function escapeRegexStr(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

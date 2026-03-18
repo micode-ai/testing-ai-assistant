@@ -345,3 +345,200 @@ Każdy typ generowania ma wyspecjalizowanego agenta z unikalnym zestawem narzęd
 - **Używaj informacji zwrotnej** — to pomaga poprawić jakość generowania
 - **Zacznij od TEST_GENERATION** — to najbardziej dojrzały typ generowania
 - **Łącz z ręcznym pokryciem** — AI uzupełnia, a nie zastępuje ręczne testy
+
+## Kreator inteligentnego generowania testów (Smart Test Generator Wizard)
+
+Kreator inteligentnego generowania testów to wieloetapowy przepływ pracy, który analizuje repozytorium projektu i generuje gotowe do użycia pliki testowe za pomocą AI. Łączy się bezpośrednio z dostawcą Git, rozumie strukturę i konwencje projektu oraz tworzy testy zgodne z istniejącymi wzorcami.
+
+### Co robi
+
+- Skanuje repozytorium w celu wykrycia języka, frameworka, wzorców testowych i struktury projektu
+- Analizuje pliki źródłowe i proponuje, jakie testy utworzyć, z opisami i poziomami priorytetu
+- Pozwala wybrać, które z proponowanych testów wygenerować
+- Generuje kompletne, uruchamialne pliki testowe z poprawnymi importami i wzorcami mockowania
+- Waliduje wygenerowany kod lokalnie (sprawdzanie typów TypeScript i ESLint) i automatycznie naprawia błędy
+- Pozwala przejrzeć i edytować każdy wygenerowany test przed zacommitowaniem
+- Tworzy dedykowaną gałąź i opcjonalnie otwiera pull request
+
+### Wymagania wstępne
+
+Przed użyciem kreatora potrzebujesz **tokenu dostawcy** skonfigurowanego dla organizacji:
+
+1. Przejdź do **Ustawień organizacji** w pasku bocznym
+2. Otwórz zakładkę **Integracje**
+3. Kliknij **Dodaj token dostawcy**
+4. Wybierz dostawcę Git (GitHub, GitLab lub Bitbucket)
+5. Wklej osobisty token dostępu lub token aplikacji z następującymi uprawnieniami:
+   - **GitHub**: zakres `repo` (pełny dostęp do repozytorium)
+   - **GitLab**: zakres `api`
+   - **Bitbucket**: uprawnienia odczytu i zapisu repozytorium
+6. Zapisz token
+
+Token jest współdzielony między wszystkimi projektami w organizacji. Każdy członek organizacji może korzystać z kreatora po skonfigurowaniu tokenu.
+
+### Przewodnik krok po kroku
+
+#### Krok 1: Rozpoczęcie sesji
+
+Otwórz projekt, przejdź do zakładki **AI** i kliknij **Generuj testy**. System tworzy nową sesję i rozpoczyna analizę repozytorium.
+
+Podczas analizy system:
+- Pobiera drzewo plików repozytorium
+- Czyta pliki konfiguracyjne (package.json, tsconfig.json, jest.config.ts itd.)
+- Identyfikuje istniejące pliki testowe i ich wzorce
+- Używa AI do zbudowania ustrukturyzowanego profilu projektu (język, framework, układ katalogów, zależności)
+
+Zwykle zajmuje to 5–15 sekund. Wynik analizy jest cachowany, więc kolejne sesje dla tego samego projektu pomijają ponowną analizę.
+
+#### Krok 2: Przegląd propozycji
+
+Po zakończeniu analizy kliknij **Wygeneruj propozycję** (lub proces może kontynuować automatycznie). Opcjonalnie możesz określić **obszar zainteresowania** (np. „moduł uwierzytelniania", „transformatory danych"), aby pokierować AI.
+
+AI analizuje do 30 plików źródłowych i tworzy listę proponowanych plików testowych. Każdy element propozycji zawiera:
+
+- **Plik docelowy**: plik źródłowy do przetestowania
+- **Ścieżka pliku testowego**: gdzie zostanie utworzony plik testowy (zgodnie z istniejącymi konwencjami nazewnictwa)
+- **Typ testu**: jednostkowy, integracyjny lub E2E
+- **Opis**: co będą pokrywać testy
+- **Uzasadnienie**: dlaczego te testy są wartościowe
+- **Priorytet**: Wysoki (krytyczna logika, brak istniejących testów), Średni (ważne, ale częściowo pokryte) lub Niski (opcjonalne)
+- **Szacowana liczba testów**: ile indywidualnych przypadków testowych zostanie wygenerowanych
+
+#### Krok 3: Zatwierdzenie elementów
+
+Przejrzyj propozycję i wybierz, które testy chcesz wygenerować. Możesz wybrać wszystkie elementy lub konkretne. Elementy o wysokim priorytecie są wyróżnione.
+
+Kliknij **Zatwierdź i wygeneruj**, aby kontynuować.
+
+#### Krok 4: Generowanie
+
+AI generuje kod testów dla każdego zatwierdzonego elementu. Odbywa się to w tle; możesz śledzić postęp w czasie rzeczywistym:
+
+- Który plik jest generowany (np. „2 z 5")
+- Bieżąca faza dla każdego pliku: zbieranie kontekstu, analiza, generowanie, post-processing, przegląd LLM
+
+Dla każdego pliku testowego system:
+1. Pobiera docelowy plik źródłowy i jego lokalne importy (typy, interfejsy, narzędzia)
+2. Pobiera do 3 istniejących plików testowych jako przykłady stylu
+3. Oblicza poprawne względne ścieżki importów od pliku testowego do plików źródłowych
+4. Wywołuje AI do wygenerowania kodu testu
+5. Usuwa formatowanie markdown, nieużywane importy/zmienne, naprawia typowe problemy z typami
+6. Uruchamia drugi przebieg AI w celu przeglądu i naprawy ścieżek importów oraz błędów typów
+
+#### Krok 5: Walidacja
+
+Po wygenerowaniu wszystkich testów system automatycznie je waliduje:
+
+1. Klonuje repozytorium do tymczasowego katalogu
+2. Instaluje zależności (automatycznie wykrywa pnpm/yarn/npm)
+3. Kopiuje wygenerowane pliki testowe do klona
+4. Uruchamia `tsc --noEmit` w celu sprawdzenia błędów TypeScript
+5. Uruchamia ESLint w celu sprawdzenia naruszeń lintingu
+6. Jeśli znaleziono błędy, wysyła je do AI w celu korekty i ponownie waliduje (do 3 prób)
+
+Możesz **pominąć walidację** w dowolnym momencie, jeśli wolisz naprawić problemy ręcznie.
+
+#### Krok 6: Przegląd
+
+Wszystkie wygenerowane testy są wyświetlane w widoku edytora. Możesz:
+
+- **Przeczytać kod** każdego wygenerowanego pliku testowego
+- **Edytować** dowolny plik testowy bezpośrednio w przeglądarce
+- **Przegenerować** poszczególne testy, które nie spełniają oczekiwań (wysyła je z powrotem przez pipeline generowania, zachowując wszystkie inne testy)
+
+Nie spiesz się na tym etapie. Sesja pozostaje w statusie `REVIEW`, dopóki nie zacommitujesz lub nie anulujesz.
+
+#### Krok 7: Commit
+
+Gdy jesteś zadowolony z testów:
+
+1. Opcjonalnie dostosuj **wiadomość commita** (domyślnie generowana jest sensowna wartość)
+2. Opcjonalnie zaznacz **Utwórz Pull Request**, aby automatycznie otworzyć PR
+3. Kliknij **Commit**
+
+System:
+- Tworzy gałąź o nazwie `ai/test-gen-{timestamp}` z domyślnej gałęzi
+- Commituje wszystkie wygenerowane pliki testowe w jednym commicie
+- Na życzenie otwiera pull request z podsumowaniem wymieniającym wszystkie wygenerowane pliki i ID sesji
+
+Otrzymasz linki do commita i pull requesta (jeśli został utworzony).
+
+### Zarządzanie sesjami
+
+#### Wznawianie sesji
+
+Sesje są zachowywane między sesjami przeglądarki. Jeśli zamkniesz stronę podczas generowania lub przeglądu, po prostu wróć do zakładki AI projektu, a lista sesji pokaże sesje w toku. Kliknij na sesję, aby wznowić od miejsca, w którym się zatrzymała.
+
+#### Anulowanie sesji
+
+Możesz anulować sesję w dowolnym momencie przed osiągnięciem stanu końcowego (COMMITTED, CANCELLED lub FAILED). Anulowanie podczas generowania zatrzymuje proces po zakończeniu bieżącego pliku. Już wygenerowane testy są zachowane w rekordzie sesji, ale nie są commitowane.
+
+#### Regeneracja testów
+
+Na etapie przeglądu możesz wybrać poszczególne testy do regeneracji bez rozpoczynania od nowa. Jest to przydatne, gdy:
+
+- Konkretny test ma nieprawidłowe wzorce mockowania
+- Chcesz wypróbować inne podejście testowe dla jednego pliku
+- AI pominął ważny przypadek brzegowy
+
+Możesz także regenerować testy z już zacommitowanej sesji, aby ulepszyć konkretne testy i zacommitować ponownie.
+
+#### Historia sesji
+
+Zakładka AI pokazuje ostatnie sesje bieżącego projektu (do 20). Możesz przeglądać poprzednie sesje, aby zobaczyć, co zostało wygenerowane, przejrzeć linki do commitów lub przegenerować z propozycji poprzedniej sesji.
+
+### Wskazówki i najlepsze praktyki
+
+1. **Określ obszar zainteresowania** podczas generowania propozycji. Ukierunkowana propozycja (np. „warstwa usług" lub „funkcje narzędziowe") daje lepsze wyniki niż analiza całej bazy kodu.
+
+2. **Zacznij od elementów o wysokim priorytecie**. Zatwierdź najpierw 3–5 testów o wysokim priorytecie, oceń jakość, a następnie wykonaj dodatkowe rundy, jeśli jesteś zadowolony.
+
+3. **Sprawdź profil projektu** po pierwszej analizie. Jeśli wykryty framework lub wzorce wyglądają nieprawidłowo, uruchom analizę ponownie lub dostosuj konfigurację projektu.
+
+4. **Dokładnie sprawdzaj ścieżki importów**. System oblicza względne importy automatycznie, ale złożone aliasy ścieżek monorepo (np. `@app/shared`) mogą wymagać ręcznej korekty.
+
+5. **Używaj istniejących testów jako przykładów**. Generator czyta do 3 istniejących plików testowych, aby dopasować styl. Jeśli repozytorium ma dobrze ustrukturyzowane przykłady testów, jakość wyjścia znacznie się poprawia.
+
+6. **Nie pomijaj walidacji bez powodu**. Walidacja tsc + eslint wykrywa rzeczywiste problemy, które spowodowałyby błąd w CI. Pętla automatycznej naprawy rozwiązuje większość problemów automatycznie.
+
+7. **Zawsze twórz PR** zamiast commitować bezpośrednio. Pozwala to zespołowi przejrzeć testy wygenerowane przez AI w normalnym procesie code review.
+
+8. **Zużycie tokenów**: Każda sesja zużywa tokeny LLM. W szczegółach sesji wyświetlane jest `totalTokensUsed`. Typowe generowanie 5 plików zużywa około 30 000–60 000 tokenów w zależności od złożoności plików źródłowych.
+
+### Rozwiązywanie problemów
+
+**„Brak skonfigurowanego tokenu GITHUB dla tej organizacji"**
+Administrator organizacji musi dodać token dostawcy w Ustawienia organizacji > Integracje. Zobacz sekcję „Wymagania wstępne" powyżej.
+
+**Sesja utknęła w stanie ANALYZING**
+System może czekać na odpowiedź API dostawcy Git. Duże repozytoria (10 000+ plików) wymagają więcej czasu. Jeśli stan utrzymuje się dłużej niż 60 sekund, sprawdź, czy token dostawcy ma wystarczające uprawnienia, a URL repozytorium jest poprawny.
+
+**Walidacja ciągle kończy się niepowodzeniem**
+Niektóre projekty mają złożone konfiguracje budowania, których walidator nie może odtworzyć w izolowanym klonie (np. niestandardowe loadery Webpack, etapy generowania kodu). Kliknij „Pomiń walidację" i napraw problemy po zacommitowaniu.
+
+**Wygenerowane testy mają nieprawidłowe ścieżki importów**
+Najczęściej zdarza się to w monorepo z aliasami ścieżek TypeScript (np. `paths` w `tsconfig.json`). System używa ścieżek względnych, a nie aliasów. Możesz edytować importy na etapie przeglądu lub skonfigurować `paths` w `tsconfig.json` zgodnie ze względnym układem.
+
+**Błąd „Nie znaleziono projektu"**
+Serwis AI pobiera metadane projektu z serwisu projektów przez wewnętrzne API. Upewnij się, że oba serwisy są uruchomione i `PROJECT_SERVICE_URL` jest poprawnie skonfigurowany.
+
+**Testy odwołują się do nieistniejących typów lub funkcji**
+AI czasami „halucynuje" właściwości interfejsów lub sygnatury funkcji. Porównaj wygenerowane obiekty mock z rzeczywistym kodem źródłowym. Przebieg walidacji LLM wykrywa większość takich przypadków, ale złożone typy mogą się prześlizgnąć.
+
+**Generowanie jest powolne**
+Każdy plik testowy wymaga 2–3 wywołań LLM (analiza, generowanie, walidacja). Dla 10 zatwierdzonych elementów spodziewaj się 3–5 minut. System przetwarza pliki sekwencyjnie, aby zarządzać limitami API i jakością kontekstu. Możesz anulować i zacommitować częściowy wynik na etapie przeglądu.
+
+### Obsługiwane języki i frameworki
+
+Kreator został przetestowany z:
+
+| Język       | Frameworki                          |
+|-------------|-------------------------------------|
+| TypeScript  | Jest, Vitest, Mocha, Playwright     |
+| JavaScript  | Jest, Vitest, Mocha                 |
+| Python      | pytest                              |
+| Java        | JUnit                               |
+| Go          | testing (biblioteka standardowa)    |
+| Rust        | cargo test                          |
+
+Najlepsze wyniki osiągane są z projektami TypeScript/JavaScript używającymi Jest lub Vitest, ponieważ mają najbardziej zaawansowane wsparcie rozwiązywania importów i walidacji.

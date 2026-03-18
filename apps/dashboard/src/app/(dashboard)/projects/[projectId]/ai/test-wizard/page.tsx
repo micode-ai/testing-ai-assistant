@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useCallback, useEffect } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
@@ -15,6 +15,8 @@ import {
   AlertCircle,
   ChevronRight,
   RotateCcw,
+  ShieldCheck,
+  Square,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,10 +31,14 @@ import { Separator } from '@/components/ui/separator';
 import {
   startTestGenSession,
   getTestGenSession,
+  getTestGenSessions,
   generateTestProposal,
   approveTestProposal,
   generateApprovedTests,
   updateGeneratedTests,
+  regenerateTests,
+  cancelSession,
+  skipValidation,
   commitTests,
 } from '@/lib/api/ai';
 import type {
@@ -43,8 +49,8 @@ import type {
   CommitResult,
 } from '@/types';
 
-const STEP_KEYS = ['analyze', 'propose', 'approve', 'generate', 'review', 'commit'] as const;
-const STEP_ICONS = [Search, ListChecks, CheckCircle2, Code2, Code2, GitBranch];
+const STEP_KEYS = ['analyze', 'propose', 'approve', 'generate', 'validate', 'review', 'commit'] as const;
+const STEP_ICONS = [Search, ListChecks, CheckCircle2, Code2, ShieldCheck, Code2, GitBranch];
 
 type StepKey = (typeof STEP_KEYS)[number];
 
@@ -58,6 +64,8 @@ function statusToStep(status: TestGenSessionStatus): StepKey {
       return 'approve';
     case 'GENERATING':
       return 'generate';
+    case 'VALIDATING':
+      return 'validate';
     case 'REVIEW':
       return 'review';
     case 'COMMITTING':
@@ -74,6 +82,8 @@ function getStepIndex(step: StepKey): number {
 
 export default function TestWizardPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const searchParams = useSearchParams();
+  const sessionIdFromUrl = searchParams.get('session');
   const { data: authSession } = useSession();
   const t = useTranslations('testWizard');
   const locale = useLocale();
@@ -92,6 +102,110 @@ export default function TestWizardPage() {
   const [createPR, setCreatePR] = useState(true);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [polling, setPolling] = useState(false);
+  const [pastSessions, setPastSessions] = useState<TestGenSession[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+
+  // Load past sessions
+  useEffect(() => {
+    if (!token) return;
+    getTestGenSessions(projectId, token)
+      .then(setPastSessions)
+      .catch(() => {})
+      .finally(() => setLoadingSessions(false));
+  }, [projectId, token]);
+
+  // Load session from URL param (?session=ID)
+  useEffect(() => {
+    if (!token || !sessionIdFromUrl || sessionData) return;
+    getTestGenSession(sessionIdFromUrl, token)
+      .then((s) => {
+        loadSession(s);
+        // If it's active, start polling
+        const bgStatuses = ['ANALYZING', 'GENERATING', 'VALIDATING'];
+        if (bgStatuses.includes(s.status)) {
+          pollSession(s.id).then((result) => {
+            if (result) loadSession(result);
+          });
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, sessionIdFromUrl]);
+
+  // Load a past session into the wizard
+  function loadSession(session: TestGenSession) {
+    setSessionData(session);
+    setError(null);
+    setCommitResult(null);
+
+    if (session.proposal) {
+      setProposal(session.proposal);
+      // Mark already-generated items
+      const generatedPaths = new Set(
+        (session.generatedTests || []).map((t) => t.path),
+      );
+      const proposalItems = session.proposal.items || [];
+      // Select items that haven't been generated yet by default
+      const ungeneratedIds = proposalItems
+        .filter((item) => !generatedPaths.has(item.testFilePath))
+        .map((item) => item.id);
+      setSelectedItems(new Set(ungeneratedIds));
+    }
+
+    if (session.generatedTests && session.generatedTests.length > 0) {
+      setGeneratedTests(session.generatedTests);
+    }
+
+    if (session.commitSha) {
+      setCommitResult({
+        branchName: session.branchName || '',
+        commitSha: session.commitSha,
+        commitUrl: session.commitUrl || '',
+        pullRequestUrl: session.pullRequestUrl || undefined,
+      });
+    }
+
+    // Set step based on status
+    setCurrentStep(statusToStep(session.status));
+  }
+
+  // Handle regeneration of specific items
+  async function handleRegenerate(itemIds: string[]) {
+    if (!sessionData || itemIds.length === 0) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      await regenerateTests(sessionData.id, itemIds, token);
+      setCurrentStep('generate');
+
+      const result = await pollSession(sessionData.id);
+      if (result && result.status === 'REVIEW' && result.generatedTests) {
+        setGeneratedTests(result.generatedTests as unknown as GeneratedTestFile[]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('failedToGenerateTests'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (!sessionData) return;
+    try {
+      await cancelSession(sessionData.id, token);
+      const updated = await getTestGenSession(sessionData.id, token);
+      setSessionData(updated);
+      setPolling(false);
+      setLoading(false);
+      if (updated.generatedTests && updated.generatedTests.length > 0) {
+        setGeneratedTests(updated.generatedTests as unknown as GeneratedTestFile[]);
+        setCurrentStep('review');
+      } else {
+        setCurrentStep('approve');
+      }
+    } catch { /* ignore */ }
+  }
 
   const pollSession = useCallback(
     async (sessionId: string) => {
@@ -110,10 +224,17 @@ export default function TestWizardPage() {
             return updated;
           }
 
-          // ANALYZING and GENERATING run in the background
-          const waitingStatuses: TestGenSessionStatus[] = ['ANALYZING', 'GENERATING'];
+          if (updated.status === 'CANCELLED') {
+            setPolling(false);
+            return updated;
+          }
+
+          // Always update the visible step to reflect current phase
+          setCurrentStep(statusToStep(updated.status));
+
+          // These statuses run in the background — keep polling
+          const waitingStatuses: TestGenSessionStatus[] = ['ANALYZING', 'GENERATING', 'VALIDATING'];
           if (!waitingStatuses.includes(updated.status)) {
-            setCurrentStep(statusToStep(updated.status));
             setPolling(false);
             return updated;
           }
@@ -294,20 +415,25 @@ export default function TestWizardPage() {
           const isActive = index === currentStepIndex;
           const isDone = index < currentStepIndex;
 
+          const canNavigate = isDone && !isProcessing && sessionData;
+
           return (
             <div key={key} className="flex items-center">
-              <div
+              <button
+                type="button"
+                disabled={!canNavigate}
+                onClick={() => canNavigate && setCurrentStep(key)}
                 className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-primary text-primary-foreground'
                     : isDone
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 cursor-pointer hover:bg-green-200 dark:hover:bg-green-900/50'
                       : 'bg-muted text-muted-foreground'
-                }`}
+                } ${canNavigate ? '' : isDone ? '' : 'cursor-default'}`}
               >
                 <Icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{t(`steps.${key}`)}</span>
-              </div>
+              </button>
               {index < STEP_KEYS.length - 1 && (
                 <ChevronRight className="mx-1 h-4 w-4 text-muted-foreground" />
               )}
@@ -343,6 +469,79 @@ export default function TestWizardPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Past Sessions */}
+      {currentStep === 'analyze' && !sessionData && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('pastSessions')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingSessions ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            ) : pastSessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('noSessions')}</p>
+            ) : (
+              <div className="space-y-2">
+                {pastSessions.map((s) => {
+                  const proposalCount = (s.proposal as TestProposal | null)?.items?.length || 0;
+                  const generatedCount = s.generatedTests?.length || 0;
+                  const remaining = proposalCount - generatedCount;
+
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {t('sessionDate', { date: new Date(s.createdAt).toLocaleDateString() })}
+                        </p>
+                        <div className="flex gap-3 text-xs text-muted-foreground">
+                          <span>{t('sessionStatus', { status: s.status })}</span>
+                          <span>{t('sessionTokens', { tokens: s.totalTokensUsed.toLocaleString() })}</span>
+                          {generatedCount > 0 && (
+                            <span>{t('generatedItems', { count: generatedCount })}</span>
+                          )}
+                          {remaining > 0 && (
+                            <span className="text-yellow-600">{t('remainingItems', { count: remaining })}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {!['COMMITTED', 'CANCELLED', 'FAILED'].includes(s.status) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await cancelSession(s.id, token);
+                              const updated = await getTestGenSessions(projectId, token);
+                              setPastSessions(updated);
+                            }}
+                          >
+                            <Square className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadSession(s)}
+                        >
+                          {t('resumeSession')}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Step 1: Analyze — initial */}
@@ -450,13 +649,20 @@ export default function TestWizardPage() {
             </div>
 
             <div className="space-y-3">
-              {proposal.items.map((item) => (
+              {proposal.items.map((item) => {
+                const isGenerated = generatedTests.some(
+                  (t) => t.path === item.testFilePath,
+                );
+
+                return (
                 <div
                   key={item.id}
                   className={`rounded-lg border p-4 cursor-pointer transition-colors ${
                     selectedItems.has(item.id)
                       ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-muted-foreground/30'
+                      : isGenerated
+                        ? 'border-green-200 bg-green-50/50 dark:border-green-800/30 dark:bg-green-950/20'
+                        : 'border-border hover:border-muted-foreground/30'
                   }`}
                   onClick={() => toggleItem(item.id)}
                 >
@@ -472,6 +678,12 @@ export default function TestWizardPage() {
                         <span className="font-medium text-sm truncate">
                           {item.testFilePath}
                         </span>
+                        {isGenerated && (
+                          <span className="flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {t('allItemsGenerated').split(' ')[0]}
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {item.description}
@@ -504,26 +716,47 @@ export default function TestWizardPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
-          <CardFooter>
-            <Button
-              onClick={handleApproveAndGenerate}
-              disabled={isProcessing || selectedItems.size === 0}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('generatingTests')}
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  {t('approveAndGenerate', { count: selectedItems.size })}
-                </>
-              )}
-            </Button>
+          <CardFooter className="flex gap-2">
+            {/* Show different buttons based on context */}
+            {generatedTests.length > 0 && selectedItems.size > 0 ? (
+              <Button
+                onClick={() => handleRegenerate(Array.from(selectedItems))}
+                disabled={isProcessing || selectedItems.size === 0}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('generatingTests')}
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    {t('generateRemaining', { count: selectedItems.size })}
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleApproveAndGenerate}
+                disabled={isProcessing || selectedItems.size === 0}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('generatingTests')}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {t('approveAndGenerate', { count: selectedItems.size })}
+                  </>
+                )}
+              </Button>
+            )}
           </CardFooter>
         </Card>
       )}
@@ -551,6 +784,21 @@ export default function TestWizardPage() {
                         {t('generatingFile', { file: sessionData.metadata.currentFile })}
                       </p>
                     )}
+                    {/* Current substep */}
+                    {(() => {
+                      const step = (sessionData.metadata as any)?.step;
+                      const stepLabels: Record<string, string> = {
+                        collecting_context: t('stepCollectingContext'),
+                        analyzing: t('stepAnalyzing'),
+                        post_processing: t('stepPostProcessing'),
+                        llm_review: t('stepLlmReview'),
+                      };
+                      return step && stepLabels[step] ? (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          {stepLabels[step]}
+                        </p>
+                      ) : null;
+                    })()}
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -584,10 +832,132 @@ export default function TestWizardPage() {
               </p>
             )}
           </CardContent>
+          <CardFooter>
+            <Button variant="destructive" size="sm" onClick={handleCancel}>
+              <Square className="mr-1 h-3 w-3" />
+              {t('cancelSession')}
+            </Button>
+          </CardFooter>
         </Card>
       )}
 
-      {/* Step 5: Review */}
+      {/* Step 5: Validate */}
+      {currentStep === 'validate' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              {t('validatingTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              const meta = sessionData?.metadata;
+              const phase = meta?.phase || 'cloning';
+              const attempt = meta?.validationAttempt || 1;
+              const maxAtt = meta?.maxAttempts || 3;
+              const errCount = meta?.errorCount || 0;
+
+              const phaseMessages: Record<string, string> = {
+                cloning: t('validationCloning'),
+                installing: t('validationInstalling'),
+                copying: t('validationCopying'),
+                type_checking: t('validationTypeChecking'),
+                linting: t('validationLinting'),
+                fixing: t('validationFixing', { errorCount: errCount, attempt, maxAttempts: maxAtt }),
+                validation_passed: t('validationPassed'),
+                validation_failed: t('validationFailed', { maxAttempts: maxAtt }),
+                validation_skipped: t('validationSkipped', { reason: meta?.validationError || '' }),
+              };
+
+              const message = phaseMessages[phase] || phase;
+              const isActive = !['validation_passed', 'validation_failed', 'validation_skipped'].includes(phase);
+
+              return (
+                <>
+                  <div className="flex items-center gap-3">
+                    {isActive ? (
+                      <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                    ) : phase === 'validation_passed' ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">{message}</p>
+                      {attempt > 1 && isActive && (
+                        <p className="text-xs text-muted-foreground">
+                          {t('generatingProgress', { current: attempt, total: maxAtt })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Validation progress steps */}
+                  <div className="space-y-2 ml-8">
+                    {['cloning', 'installing', 'type_checking', 'linting'].map((step) => {
+                      const stepLabels: Record<string, string> = {
+                        cloning: t('validationCloning'),
+                        installing: t('validationInstalling'),
+                        type_checking: t('validationTypeChecking'),
+                        linting: t('validationLinting'),
+                      };
+                      const stepOrder = ['cloning', 'installing', 'copying', 'type_checking', 'linting', 'fixing'];
+                      const currentIdx = stepOrder.indexOf(phase);
+                      const stepIdx = stepOrder.indexOf(step);
+                      const isDone = stepIdx < currentIdx;
+                      const isCurrent = step === phase || (phase === 'copying' && step === 'installing');
+
+                      return (
+                        <div key={step} className="flex items-center gap-2 text-sm">
+                          {isDone ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                          ) : isCurrent ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          ) : (
+                            <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/30" />
+                          )}
+                          <span className={isDone ? 'text-muted-foreground' : isCurrent ? 'font-medium' : 'text-muted-foreground/50'}>
+                            {stepLabels[step]}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {sessionData && sessionData.totalTokensUsed > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('totalTokensUsed', { count: sessionData.totalTokensUsed.toLocaleString() })}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </CardContent>
+          <CardFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!sessionData) return;
+                try {
+                  await skipValidation(sessionData.id, token);
+                  const updated = await getTestGenSession(sessionData.id, token);
+                  loadSession(updated);
+                } catch { /* ignore */ }
+              }}
+            >
+              {t('skipValidation')}
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleCancel}>
+              <Square className="mr-1 h-3 w-3" />
+              {t('cancelSession')}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      {/* Step 6: Review */}
       {currentStep === 'review' && generatedTests.length > 0 && (
         <Card>
           <CardHeader>
@@ -599,15 +969,34 @@ export default function TestWizardPage() {
               <div key={test.path} className="rounded-lg border">
                 <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/50">
                   <span className="font-mono text-sm">{test.path}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setEditingIndex(editingIndex === index ? null : index)
-                    }
-                  >
-                    {editingIndex === index ? t('preview') : t('edit')}
-                  </Button>
+                  <div className="flex gap-1">
+                    {(() => {
+                      // Find proposal item for this test file to get its ID
+                      const proposalItem = proposal?.items?.find(
+                        (item) => item.testFilePath === test.path,
+                      );
+                      return proposalItem ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRegenerate([proposalItem.id])}
+                          disabled={isProcessing}
+                        >
+                          <RotateCcw className="mr-1 h-3 w-3" />
+                          {t('regenerateTest')}
+                        </Button>
+                      ) : null;
+                    })()}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setEditingIndex(editingIndex === index ? null : index)
+                      }
+                    >
+                      {editingIndex === index ? t('preview') : t('edit')}
+                    </Button>
+                  </div>
                 </div>
                 {editingIndex === index ? (
                   <textarea

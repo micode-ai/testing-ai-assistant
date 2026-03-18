@@ -149,7 +149,19 @@ export class TestGeneratorAgent extends BaseAgent {
         'You are an expert test engineer. Based on the analysis provided, generate complete, runnable test code. ' +
         `Use the ${testFramework} framework. Write tests in ${language}. ` +
         'Include proper imports, setup/teardown, meaningful test names, and comprehensive assertions. ' +
-        'Output ONLY the test code, no explanations.',
+        'Output ONLY the test code, no explanations.\n\n' +
+        'CRITICAL RULES:\n' +
+        '- Use ONLY types, interfaces, and enums that are defined in the provided file contents. Do NOT invent types.\n' +
+        '- Match ALL required properties when creating mock objects — check the interface definition carefully.\n' +
+        '- Use correct mock return types matching the actual function signatures.\n' +
+        '- If existing test examples are provided, follow their patterns EXACTLY for imports, mocking style, and structure.\n' +
+        '- NEVER use @ts-expect-error.\n' +
+        '- NEVER import symbols you do not use. Only import what is actually referenced in the test code.\n' +
+        '- NEVER declare variables that are not used later in the code.\n' +
+        '- Do NOT use Node.js global types like NodeJS.ProcessEnv directly — use process.env with string indexing instead.\n' +
+        '- For environment variables, use process.env["VAR_NAME"] or typed wrappers from the source code.\n' +
+        '- Do NOT use ambient/global type references unless they are in the provided file contents.\n' +
+        '- The generated code MUST pass both strict TypeScript compilation AND ESLint with no-unused-vars rule.',
       ),
       new HumanMessage(
         `Analysis:\n${state.analysis}\n\n` +
