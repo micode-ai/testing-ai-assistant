@@ -46,6 +46,11 @@
     "chat": "Чат",
     "ai": "ИИ",
     "settings": "Настройки",
+    "pipelines": "Пайплайны",
+    "aiHub": "ИИ Хаб",
+    "workspace": "Рабочее пространство",
+    "selectOrgHint": "Выберите организацию, чтобы начать",
+    "projectSection": "Проект",
     "notifications": "Уведомления",
     "appName": "Testing AI"
   },

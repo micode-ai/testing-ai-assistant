@@ -31,6 +31,7 @@ Gateway prefix: `/api/identity`
 | `POST` | `/auth/refresh` | Public | Refresh access token |
 | `POST` | `/auth/logout` | Bearer JWT | Logout and revoke refresh token |
 | `GET` | `/auth/me` | Bearer JWT | Get current authenticated user |
+| `POST` | `/api/v1/users/batch` | Internal (Public) | Batch-resolve user IDs to profiles |
 
 ### Request/Response Examples
 
@@ -75,6 +76,32 @@ Gateway prefix: `/api/identity`
     "avatarUrl": null
   }
 }
+```
+
+**POST /api/v1/users/batch** *(Internal)*
+```json
+// Request
+{
+  "ids": ["cuid_user_id_1", "cuid_user_id_2"]
+}
+
+// Response (200)
+[
+  {
+    "id": "cuid_user_id_1",
+    "email": "alice@example.com",
+    "name": "Alice",
+    "avatarUrl": null,
+    "createdAt": "2025-01-15T10:30:00.000Z"
+  },
+  {
+    "id": "cuid_user_id_2",
+    "email": "bob@example.com",
+    "name": "Bob",
+    "avatarUrl": "https://avatars.example.com/bob.png",
+    "createdAt": "2025-02-01T08:00:00.000Z"
+  }
+]
 ```
 
 ---

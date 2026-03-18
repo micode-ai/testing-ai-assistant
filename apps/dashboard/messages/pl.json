@@ -46,6 +46,11 @@
     "chat": "Czat",
     "ai": "AI",
     "settings": "Ustawienia",
+    "pipelines": "Potoki",
+    "aiHub": "Centrum AI",
+    "workspace": "Przestrzeń robocza",
+    "selectOrgHint": "Wybierz organizację, aby rozpocząć",
+    "projectSection": "Projekt",
     "notifications": "Powiadomienia",
     "appName": "Testing AI"
   },

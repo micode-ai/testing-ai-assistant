@@ -24,15 +24,54 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import type { Membership } from '@/types';
+import type { Membership, User } from '@/types';
 
 const ORG_API_URL = process.env.NEXT_PUBLIC_ORG_API_URL || 'http://localhost:3002';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 const roleBadgeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
   ADMIN: 'default',
   MEMBER: 'secondary',
   VIEWER: 'outline',
 };
+
+async function fetchUsersByIds(ids: string[]): Promise<Record<string, Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>>> {
+  if (ids.length === 0) return {};
+  try {
+    const res = await fetch(`${API_URL}/api/v1/users/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (res.ok) {
+      const users: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>[] = await res.json();
+      const map: Record<string, Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>> = {};
+      for (const u of users) {
+        map[u.id] = u;
+      }
+      return map;
+    }
+  } catch {
+    // Best-effort
+  }
+  return {};
+}
+
+function MemberName({ member, userMap }: {
+  member: Membership;
+  userMap: Record<string, Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>>;
+}) {
+  const user = userMap[member.userId];
+  if (user) {
+    return (
+      <div>
+        <p className="text-sm font-medium">{user.name}</p>
+        <p className="text-xs text-muted-foreground">{user.email}</p>
+      </div>
+    );
+  }
+  return <p className="text-sm font-medium text-muted-foreground">{member.userId}</p>;
+}
 
 export default function MembersPage() {
   const t = useTranslations('orgMembers');
@@ -41,6 +80,7 @@ export default function MembersPage() {
   const orgId = params.orgId;
   const { data: session } = useSession();
   const [members, setMembers] = useState<Membership[]>([]);
+  const [userMap, setUserMap] = useState<Record<string, Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -57,7 +97,11 @@ export default function MembersPage() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       if (res.ok) {
-        setMembers(await res.json());
+        const data: Membership[] = await res.json();
+        setMembers(data);
+        const userIds = [...new Set(data.map((m) => m.userId))];
+        const users = await fetchUsersByIds(userIds);
+        setUserMap(users);
       }
     } catch {
       // Silently fail
@@ -222,8 +266,8 @@ export default function MembersPage() {
                   className="flex items-center justify-between rounded-lg border p-3"
                 >
                   <div>
-                    <p className="text-sm font-medium">{tc('user')}: {member.userId}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <MemberName member={member} userMap={userMap} />
+                    <p className="text-xs text-muted-foreground mt-1">
                       {t('requested')} {new Date(member.requestedAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -272,8 +316,8 @@ export default function MembersPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div>
-                      <p className="text-sm font-medium">{tc('user')}: {member.userId}</p>
-                      <Badge variant={roleBadgeVariant[member.role] ?? 'secondary'}>
+                      <MemberName member={member} userMap={userMap} />
+                      <Badge variant={roleBadgeVariant[member.role] ?? 'secondary'} className="mt-1">
                         {member.role}
                       </Badge>
                     </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import {
@@ -34,6 +35,7 @@ const planConfig: Record<string, { variant: 'default' | 'secondary' | 'outline';
 
 export default function OrganizationsPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const { currentOrgId, setCurrentOrgId } = useOrgStore();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,11 +135,15 @@ export default function OrganizationsPage() {
                 className={`group cursor-pointer hover:shadow-md transition-all ${isActive ? 'ring-2 ring-primary' : ''}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => setCurrentOrgId(org.id)}
+                onClick={() => {
+                  setCurrentOrgId(org.id);
+                  router.push(`/organizations/${org.id}`);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     setCurrentOrgId(org.id);
+                    router.push(`/organizations/${org.id}`);
                   }
                 }}
               >
@@ -161,10 +167,14 @@ export default function OrganizationsPage() {
 
                 <CardContent className="pb-3">
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
+                    <Link
+                      href={`/organizations/${org.id}/members`}
+                      className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Users className="h-4 w-4" aria-hidden="true" />
                       <span>{t('members', { count: org.memberCount ?? 0 })}</span>
-                    </div>
+                    </Link>
                     <span className="text-xs">
                       {new Date(org.createdAt).toLocaleDateString()}
                     </span>
@@ -181,7 +191,7 @@ export default function OrganizationsPage() {
                       asChild
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Link href={`/organizations/${org.id}`}>
+                      <Link href={`/organizations/${org.id}/settings`}>
                         <Settings className="mr-1 h-3 w-3" aria-hidden="true" />
                         {tc('settings')}
                       </Link>
@@ -198,13 +208,7 @@ export default function OrganizationsPage() {
                       {deletingId === org.id ? tc('deleting') : tc('delete')}
                     </Button>
                   </div>
-                  <Link
-                    href={`/organizations/${org.id}`}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                  </Link>
+                  <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors" aria-hidden="true" />
                 </CardFooter>
               </Card>
             );

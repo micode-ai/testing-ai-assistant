@@ -37,6 +37,7 @@ apps/dashboard/src/app/
     │   ├── page.tsx                     # Список проектов
     │   ├── new/page.tsx                 # Создание проекта
     │   └── [projectId]/
+    │       ├── layout.tsx               # Layout проекта (синхронизация контекста)
     │       ├── page.tsx                 # Обзор проекта
     │       ├── settings/page.tsx        # Настройки проекта
     │       ├── pipelines/
@@ -178,21 +179,17 @@ NextAuth middleware защищает маршруты дашборда:
 Dashboard использует Zustand для клиентского состояния:
 
 ```typescript
-// Пример структуры store
-interface DashboardStore {
-  // Организация
-  currentOrg: Organization | null;
-  organizations: Organization[];
-  setCurrentOrg: (org: Organization) => void;
-
-  // Проекты
-  projects: Project[];
-  currentProject: Project | null;
-
-  // UI
-  sidebarOpen: boolean;
-  toggleSidebar: () => void;
+// org-store.ts
+interface OrgStore {
+  currentOrgId: string | null;
+  currentProjectId: string | null;
+  currentProjectName: string | null;
+  setCurrentOrgId: (id: string | null) => void;
+  setCurrentProject: (id: string | null, name: string | null) => void;
 }
+
+// Хук useProjectContext синхронизирует параметры маршрута
+// [projectId] со стором Zustand через layout проекта
 ```
 
 ### Паттерн использования

@@ -69,6 +69,36 @@ http://localhost/api/<service>
 }
 ```
 
+### Użytkownicy (endpointy wewnętrzne)
+
+| Metoda | Ścieżka | Opis |
+|--------|---------|------|
+| `POST` | `/api/v1/users/batch` | Pobranie użytkowników po identyfikatorach (wewnętrzny, bez auth) |
+
+#### POST /api/v1/users/batch
+
+```json
+// Żądanie
+{
+  "ids": ["uuid-1", "uuid-2"]
+}
+
+// Odpowiedź 200
+[
+  {
+    "id": "uuid-1",
+    "email": "jan@example.com",
+    "name": "Jan Kowalski",
+    "avatarUrl": "https://...",
+    "createdAt": "2026-01-15T08:00:00Z"
+  }
+]
+```
+
+> **Uwaga:** Endpoint wewnętrzny (`@Public()`), bez wymaganej autoryzacji JWT. Używany przez dashboard do rozwiązywania identyfikatorów użytkowników.
+
+---
+
 #### POST /auth/login
 
 ```json

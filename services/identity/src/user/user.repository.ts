@@ -18,6 +18,12 @@ export class UserRepository {
     });
   }
 
+  async findByIds(ids: string[]): Promise<User[]> {
+    return this.prisma.user.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+    });
+  }
+
   async findByKeycloakId(keycloakId: string): Promise<User | null> {
     return this.prisma.user.findFirst({
       where: { keycloakId, deletedAt: null },

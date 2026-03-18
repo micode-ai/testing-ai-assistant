@@ -74,6 +74,7 @@ model RefreshToken {
 | `POST` | `/auth/refresh` | Public | Refresh access token using refresh token |
 | `POST` | `/auth/logout` | Bearer JWT | Logout and revoke refresh token |
 | `GET` | `/auth/me` | Bearer JWT | Get current authenticated user profile |
+| `POST` | `/api/v1/users/batch` | Internal (Public) | Batch-resolve user IDs to profiles |
 
 ## Authentication Flows
 

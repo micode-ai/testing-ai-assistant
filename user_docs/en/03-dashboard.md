@@ -28,10 +28,10 @@ Click on the avatar in the top right corner and select "Sign Out". The token wil
 
 ### Organizations
 
-- **Organization list** — all organizations you belong to
+- **Organization list** — all organizations you belong to; clicking a card navigates to the organization detail page
 - **Create organization** — "New Organization" button
 - **Organization settings** — edit name, description
-- **Member management** — invite, approve, assign roles
+- **Member management** — invite, approve, assign roles; shows real user names and emails
 
 ### Projects
 
@@ -98,17 +98,13 @@ Click on the avatar in the top right corner and select "Sign Out". The token wil
 
 ## Navigation
 
-The sidebar contains the main sections:
+The sidebar uses tiered navigation that adapts based on your current context:
 
-1. **Home** — overview and quick actions
-2. **Organizations** — organization management
-3. **Projects** — project management
-4. **Pipelines** — test pipelines
-5. **Checklists** — test checklists
-6. **Chat** — AI chat assistant
-7. **AI** — AI generation and analysis
-8. **Notifications** — notification settings
-9. **Settings** — profile and preferences
+- **Tier 0** (always visible): Home, Organizations
+- **Tier 1** (when an organization is selected): Projects, Runs
+- **Tier 2** (when a project is selected): AI Chat, Pipelines, Coverage, Checklists, AI Hub
+
+The organization switcher in the sidebar lets you change context quickly — selecting an organization navigates to its projects list. A gear icon next to the switcher links to organization settings.
 
 ## Tips
 

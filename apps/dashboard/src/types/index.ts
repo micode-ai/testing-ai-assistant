@@ -23,6 +23,7 @@ export interface Membership {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   requestedAt: string;
   resolvedAt: string | null;
+  user?: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>;
 }
 
 export type RepoProvider = 'GITHUB' | 'GITLAB' | 'BITBUCKET';

@@ -98,6 +98,7 @@ cd services/test-runner && npx tsc --noEmit
 ### Inter-Service Communication
 
 - **Dashboard → Services**: Direct REST calls with JWT Bearer token from NextAuth session
+- **Dashboard → Identity**: `POST /api/v1/users/batch` (no auth, `@Public()`) to resolve user IDs to names/emails (used by members page)
 - **Pipeline → Project**: HTTP via `ProjectClient` to internal endpoint `/api/v1/projects/:id` (no auth)
 - **Pipeline → Temporal**: Starts workflows (`testPipelineWorkflow`, `checklistRunWorkflow`)
 - **Test Runner → Pipeline**: HTTP reporting to `/api/v1/runs/:id/status` and `/api/v1/checklist-runs/:id` (no auth, `@Public()` endpoints)
@@ -109,9 +110,10 @@ Services use `@Public()` decorator + `@Controller('api/v1/...')` for inter-servi
 
 ### Key Patterns
 
-- **NestJS modules**: Controller → Service → Repository → Prisma. DTOs for request/response. EventEmitter2 for domain events.
+- **NestJS modules**: Controller → Service → Repository → Prisma. DTOs for request/response. EventEmitter2 for domain events. Internal endpoints use separate `*-internal.controller.ts` files with `@Public()` + `@Controller('api/v1/...')`.
 - **Prisma**: Each service has its own `prisma/schema.prisma` and `generated/prisma/` client (gitignored).
 - **Dashboard API clients**: Each backend has its own fetch wrapper in `apps/dashboard/src/lib/api/`. Client components must pass `token` from `useSession()` explicitly — `auth()` only works server-side.
+- **Dashboard navigation**: Sidebar uses tiered visibility controlled by Zustand store (`org-store.ts`): Tier 0 (always), Tier 1 (when org selected), Tier 2 (when project selected). Project context is synced from route params via `useProjectContext` hook in `projects/[projectId]/layout.tsx`.
 - **AI Agents**: LangGraph state machines in `services/ai/src/agents/`. Pattern: analyze → generate → validate → refine (up to 3x) → format. Two models: `OPENAI_MODEL_ADVANCED` (o3) for generation, `OPENAI_MODEL_FAST` (gpt-4.1-mini) for validation.
 - **Test execution**: Temporal workflows in `services/test-runner/src/workflows/`. Activities report progress via HTTP to pipeline service. Steps appear on UI via polling (3s) + SSE.
 

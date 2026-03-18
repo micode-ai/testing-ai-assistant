@@ -60,6 +60,7 @@ RefreshToken
 | `POST` | `/auth/refresh` | Публичный | Обновление пары токенов |
 | `POST` | `/auth/logout` | Bearer JWT | Выход и отзыв refresh token |
 | `GET` | `/auth/me` | Bearer JWT | Получение текущего пользователя |
+| `POST` | `/api/v1/users/batch` | Внутренний (`@Public()`) | Получение пользователей по массиву ID |
 
 ## Потоки аутентификации
 

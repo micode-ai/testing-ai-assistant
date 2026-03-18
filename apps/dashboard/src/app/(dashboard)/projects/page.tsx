@@ -7,6 +7,8 @@ import { useTranslations } from 'next-intl';
 import { FolderGit2, Plus, Webhook, Trash2 } from 'lucide-react';
 import { useOrgStore } from '@/lib/stores/org-store';
 import { Button } from '@/components/ui/button';
+
+// Clear project context when returning to project list
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -22,7 +24,7 @@ const PROJECT_API_URL = process.env.NEXT_PUBLIC_PROJECT_API_URL || 'http://local
 
 export default function ProjectsPage() {
   const { data: session } = useSession();
-  const { currentOrgId } = useOrgStore();
+  const { currentOrgId, clearCurrentProject } = useOrgStore();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -30,6 +32,10 @@ export default function ProjectsPage() {
   const tc = useTranslations('common');
 
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
+
+  useEffect(() => {
+    clearCurrentProject();
+  }, [clearCurrentProject]);
 
   const fetchProjects = useCallback(async () => {
     if (!token || !currentOrgId) {

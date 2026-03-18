@@ -43,6 +43,7 @@ src/app/
       page.tsx                        # Project list
       new/page.tsx                    # Create project
       [projectId]/
+        layout.tsx                    # Project context layout (syncs projectId to Zustand)
         page.tsx                      # Project overview
         settings/page.tsx             # Project settings
         pipelines/
@@ -256,7 +257,8 @@ Zustand manages UI state that is not derived from server data:
 
 | State | Description |
 |---|---|
-| Active organization ID | Currently selected organization context |
+| Active organization ID | Currently selected organization context (via `org-store.ts`) |
+| Active project ID & name | Currently selected project context (via `org-store.ts`, synced by `useProjectContext` hook) |
 | Sidebar collapsed | Dashboard sidebar visibility |
 | Theme preference | Light/dark mode |
 | Filter states | Active filters on list pages |

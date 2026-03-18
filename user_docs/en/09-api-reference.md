@@ -100,6 +100,34 @@ http://localhost/api/<service>
 }
 ```
 
+### Users (Internal)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/users/batch` | Batch-resolve user IDs to profiles |
+
+#### POST /api/v1/users/batch
+
+Internal endpoint (no JWT required). Used by the dashboard to resolve user IDs to display names.
+
+```json
+// Request
+{
+  "ids": ["cuid_user_id_1", "cuid_user_id_2"]
+}
+
+// Response 200
+[
+  {
+    "id": "cuid_user_id_1",
+    "email": "alice@example.com",
+    "name": "Alice",
+    "avatarUrl": null,
+    "createdAt": "2026-03-12T10:00:00Z"
+  }
+]
+```
+
 ---
 
 ## Organization Service (port 3002)

@@ -98,17 +98,24 @@ Kliknij na awatar w prawym górnym rogu i wybierz „Wyloguj się". Token zostan
 
 ## Nawigacja
 
-Menu boczne zawiera główne sekcje:
+Menu boczne jest wielopoziomowe — widoczne sekcje zależą od kontekstu:
 
-1. **Strona główna** — przegląd i szybkie akcje
-2. **Organizacje** — zarządzanie organizacjami
-3. **Projekty** — zarządzanie projektami
-4. **Pipeline'y** — pipeline'y testowe
-5. **Listy kontrolne** — checklisty testowe
-6. **Czat** — asystent czatu AI
-7. **AI** — generowanie i analiza AI
-8. **Powiadomienia** — ustawienia powiadomień
-9. **Ustawienia** — profil i preferencje
+**Poziom 0** (zawsze widoczne):
+- **Strona główna** — przegląd i szybkie akcje
+- **Organizacje** — zarządzanie organizacjami
+
+**Poziom 1** (po wybraniu organizacji):
+- **Projekty** — zarządzanie projektami w organizacji
+- **Uruchomienia** — przebiegi testów w organizacji
+
+**Poziom 2** (po wybraniu projektu):
+- **Czat AI** — konwersacyjny asystent AI
+- **Potoki** — pipeline'y testowe
+- **Pokrycie** — pokrycie kodu
+- **Listy kontrolne** — checklisty testowe
+- **Centrum AI** — generowanie i analiza AI
+
+Przełącznik organizacji (OrgSwitcher) po wybraniu organizacji automatycznie nawiguje do strony `/projects`. Karty organizacji po kliknięciu przechodzą do strony szczegółów organizacji, a licznik członków prowadzi do `/organizations/{id}/members`.
 
 ## Wskazówki
 
