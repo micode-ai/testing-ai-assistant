@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Patch,
   Post,
   Body,
@@ -11,7 +12,9 @@ import {
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../common/decorators/public.decorator';
 import { TestRunService } from './test-run.service';
+import { TestRunRepository } from './test-run.repository';
 import { TestResultService } from '../test-result/test-result.service';
+import { PipelineRepository } from '../pipeline/pipeline.repository';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateRunStatusDto } from './dto/update-run-status.dto';
 import { ReportStepResultDto } from './dto/report-step-result.dto';
@@ -25,9 +28,41 @@ export class RunReportController {
 
   constructor(
     private readonly testRunService: TestRunService,
+    private readonly testRunRepository: TestRunRepository,
     private readonly testResultService: TestResultService,
+    private readonly pipelineRepository: PipelineRepository,
     private readonly prisma: PrismaService,
   ) {}
+
+  @Get('by-project/:projectId/latest')
+  @ApiOperation({ summary: 'Get latest completed run with results for a project (internal)' })
+  async getLatestByProject(@Param('projectId') projectId: string) {
+    const pipelines = await this.pipelineRepository.findByProjectId(projectId);
+    if (pipelines.length === 0) {
+      return null;
+    }
+
+    const pipelineIds = pipelines.map((p) => p.id);
+    const run = await this.testRunRepository.findLatestCompletedByPipelineIds(pipelineIds);
+    if (!run) {
+      return null;
+    }
+
+    return {
+      runId: run.id,
+      status: run.status,
+      branch: run.branch,
+      commitSha: run.commitSha,
+      finishedAt: run.finishedAt,
+      results: (run as any).results.map((r: any) => ({
+        checkType: r.checkType,
+        status: r.status,
+        summary: r.summary,
+        details: r.details,
+        durationMs: r.durationMs,
+      })),
+    };
+  }
 
   @Patch(':runId/status')
   @HttpCode(HttpStatus.OK)

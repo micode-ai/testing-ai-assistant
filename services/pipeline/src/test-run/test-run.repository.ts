@@ -49,4 +49,16 @@ export class TestRunRepository {
   async update(id: string, data: Prisma.TestRunUpdateInput): Promise<TestRun> {
     return this.prisma.testRun.update({ where: { id }, data });
   }
+
+  async findLatestCompletedByPipelineIds(pipelineIds: string[]) {
+    if (pipelineIds.length === 0) return null;
+    return this.prisma.testRun.findFirst({
+      where: {
+        pipelineId: { in: pipelineIds },
+        status: { in: ['PASSED', 'FAILED'] },
+      },
+      orderBy: { finishedAt: 'desc' },
+      include: { results: true },
+    });
+  }
 }

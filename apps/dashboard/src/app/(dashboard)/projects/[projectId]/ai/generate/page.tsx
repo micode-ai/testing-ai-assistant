@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useTranslations } from 'next-intl';
-import { Loader2, Sparkles, Check, X } from 'lucide-react';
+import { useTranslations, useLocale } from 'next-intl';
+import { Loader2, Sparkles, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
+import { BugReportView } from '@/components/shared/bug-report-view';
 import { triggerGeneration, submitFeedback } from '@/lib/api/ai';
 import type { AIGeneration, GenerationType } from '@/types';
 
@@ -24,6 +25,7 @@ export default function GeneratePage() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const t = useTranslations();
+  const locale = useLocale();
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
   const initialType = (searchParams.get('type') as GenerationType) || 'TEST_GEN';
 
@@ -46,6 +48,7 @@ export default function GeneratePage() {
   const [feedbackText, setFeedbackText] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [showBugDetectAdvanced, setShowBugDetectAdvanced] = useState(false);
 
   function buildInputContext(): Record<string, unknown> {
     switch (type) {
@@ -56,10 +59,14 @@ export default function GeneratePage() {
           testFramework,
         };
       case 'BUG_DETECT':
-        return {
-          ...(runId ? { runId } : {}),
-          ...(testResults ? { testResults } : {}),
-        };
+        if (testResults || runId) {
+          return {
+            locale,
+            ...(runId ? { runId } : {}),
+            ...(testResults ? { testResults } : {}),
+          };
+        }
+        return { locale };
       case 'FLAKY_DETECT':
         return { autoLoadHistory: true };
       case 'COVERAGE_ADVICE':
@@ -184,28 +191,48 @@ export default function GeneratePage() {
 
           {type === 'BUG_DETECT' && (
             <>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">{t('aiGenerate.runId')}</label>
-                <input
-                  type="text"
-                  value={runId}
-                  onChange={(e) => setRunId(e.target.value)}
-                  placeholder={t('aiGenerate.runIdPlaceholder')}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  disabled={generating}
-                />
+              <div className="rounded-md bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800">
+                {t('aiGenerate.bugDetectAutoNote')}
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">{t('aiGenerate.testResults')}</label>
-                <textarea
-                  value={testResults}
-                  onChange={(e) => setTestResults(e.target.value)}
-                  placeholder={t('aiGenerate.testResultsPlaceholder')}
-                  rows={6}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  disabled={generating}
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowBugDetectAdvanced(!showBugDetectAdvanced)}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                disabled={generating}
+              >
+                {showBugDetectAdvanced ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                {t('aiGenerate.advancedOverride')}
+              </button>
+              {showBugDetectAdvanced && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">{t('aiGenerate.runId')}</label>
+                    <input
+                      type="text"
+                      value={runId}
+                      onChange={(e) => setRunId(e.target.value)}
+                      placeholder={t('aiGenerate.runIdPlaceholder')}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      disabled={generating}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">{t('aiGenerate.testResults')}</label>
+                    <textarea
+                      value={testResults}
+                      onChange={(e) => setTestResults(e.target.value)}
+                      placeholder={t('aiGenerate.testResultsPlaceholder')}
+                      rows={6}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      disabled={generating}
+                    />
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -260,11 +287,15 @@ export default function GeneratePage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-md bg-muted p-4 overflow-x-auto">
-              <pre className="text-sm">
-                <code>{result.output}</code>
-              </pre>
-            </div>
+            {result.type === 'BUG_DETECT' ? (
+              <BugReportView output={result.output} />
+            ) : (
+              <div className="rounded-md bg-muted p-4 overflow-x-auto">
+                <pre className="text-sm">
+                  <code>{result.output}</code>
+                </pre>
+              </div>
+            )}
 
             {/* Feedback Section */}
             {!feedbackSubmitted && result.accepted === null && (

@@ -23,6 +23,7 @@ import { ProjectAnalyzerService } from '../agents/project-analyzer/project-analy
 import { TestProposerService } from '../agents/test-proposer/test-proposer.service';
 import { ChecklistItemChatService } from '../agents/checklist-item-chat/checklist-item-chat.service';
 import { AgentOutput } from '../agents/types';
+import { BugDetectContextService } from './bug-detect-context.service';
 
 @Injectable()
 export class GenerationService {
@@ -40,6 +41,7 @@ export class GenerationService {
     private readonly projectAnalyzerService: ProjectAnalyzerService,
     private readonly testProposerService: TestProposerService,
     private readonly checklistItemChatService: ChecklistItemChatService,
+    private readonly bugDetectContextService: BugDetectContextService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -158,8 +160,34 @@ export class GenerationService {
     switch (type) {
       case GenerationType.TEST_GEN:
         return this.testGeneratorService.generate(input as any);
-      case GenerationType.BUG_DETECT:
-        return this.bugDetectorService.detect(input as any);
+      case GenerationType.BUG_DETECT: {
+        const bugCtx = inputContext as Record<string, unknown>;
+        const locale = (bugCtx.locale as string) || undefined;
+        let context;
+
+        if (bugCtx.testResults || bugCtx.codeDiff || bugCtx.diff) {
+          // Manual override: user provided data explicitly
+          let testResults: unknown[] = [];
+          if (typeof bugCtx.testResults === 'string') {
+            try { testResults = JSON.parse(bugCtx.testResults); } catch { testResults = []; }
+          } else if (Array.isArray(bugCtx.testResults)) {
+            testResults = bugCtx.testResults;
+          }
+          context = {
+            codeDiff: (bugCtx.codeDiff as string) || (bugCtx.diff as string) || '',
+            testResults,
+            existingCodeContext: (bugCtx.existingCodeContext as Record<string, string>) || {},
+            locale,
+          };
+        } else {
+          // Auto-fetch: get project context from git repo and pipeline
+          this.logger.log(`Auto-fetching bug detect context for project ${projectId}`);
+          const autoContext = await this.bugDetectContextService.fetchBugDetectContext(projectId);
+          context = { ...autoContext, locale };
+        }
+
+        return this.bugDetectorService.detect({ projectId, context } as any);
+      }
       case GenerationType.FLAKY_DETECT:
         return this.flakyDetectorService.analyze(input as any);
       case GenerationType.COVERAGE_ADVICE:

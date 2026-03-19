@@ -95,7 +95,7 @@ export async function submitFeedback(
   token?: string,
 ): Promise<void> {
   return aiClient<void>(`/ai/generations/${id}/feedback`, {
-    method: 'POST',
+    method: 'PATCH',
     body: JSON.stringify({ accepted, feedback }),
     token,
   });

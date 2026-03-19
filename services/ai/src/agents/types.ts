@@ -36,6 +36,7 @@ export interface BugDetectInput extends AgentInput {
     codeDiff: string;
     testResults: TestResultEntry[];
     existingCodeContext: Record<string, string>;
+    locale?: string;
   };
 }
 

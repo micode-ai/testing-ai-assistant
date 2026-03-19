@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
 import { getGeneration, submitFeedback } from '@/lib/api/ai';
 import { PageSkeleton } from '@/components/shared/page-skeleton';
+import { BugReportView } from '@/components/shared/bug-report-view';
 import type { AIGeneration } from '@/types';
 
 export default function GenerationDetailPage() {
@@ -170,11 +171,15 @@ export default function GenerationDetailPage() {
           <CardDescription>{t('aiDetail.outputDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md bg-muted p-4 overflow-x-auto">
-            <pre className="text-sm">
-              <code>{generation.output}</code>
-            </pre>
-          </div>
+          {generation.type === 'BUG_DETECT' ? (
+            <BugReportView output={generation.output} />
+          ) : (
+            <div className="rounded-md bg-muted p-4 overflow-x-auto">
+              <pre className="text-sm">
+                <code>{generation.output}</code>
+              </pre>
+            </div>
+          )}
         </CardContent>
       </Card>
 
