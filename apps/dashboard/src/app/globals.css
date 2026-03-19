@@ -102,3 +102,17 @@
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
+
+/* Help markdown: inline code vs block code */
+@layer components {
+  .help-markdown :not(pre) > code {
+    @apply rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-primary;
+  }
+  .help-markdown .help-code-block code {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-size: inherit !important;
+    color: inherit !important;
+  }
+}

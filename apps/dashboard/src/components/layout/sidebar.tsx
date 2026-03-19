@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
-  BarChart3, Bell, Building2, ClipboardList, FolderGit2, LayoutDashboard,
+  BarChart3, Bell, Building2, ClipboardList, FolderGit2, HelpCircle, LayoutDashboard,
   MessageSquare, Play, Sparkles, X, Workflow, Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ const tier1Items = [
 ];
 
 const settingsItems = [
+  { href: '/help', labelKey: 'help', icon: HelpCircle },
   { href: '/settings/notifications', labelKey: 'notifications', icon: Bell },
 ] as const;
 

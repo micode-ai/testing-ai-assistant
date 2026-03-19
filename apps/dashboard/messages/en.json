@@ -51,6 +51,7 @@
     "workspace": "Workspace",
     "selectOrgHint": "Select an organization to get started",
     "projectSection": "Project",
+    "help": "Help",
     "notifications": "Notifications",
     "appName": "Testing AI"
   },
@@ -582,6 +583,14 @@
     "inputPlaceholder": "Ask something...",
     "result": "result",
     "failedToLoad": "Failed to load chat"
+  },
+  "help": {
+    "title": "Documentation",
+    "subtitle": "User guide and reference",
+    "search": "Search docs...",
+    "noResults": "No results found",
+    "prevArticle": "Previous",
+    "nextArticle": "Next"
   },
   "language": {
     "label": "Language",

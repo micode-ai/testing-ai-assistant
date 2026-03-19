@@ -51,6 +51,7 @@
     "workspace": "Рабочее пространство",
     "selectOrgHint": "Выберите организацию, чтобы начать",
     "projectSection": "Проект",
+    "help": "Справка",
     "notifications": "Уведомления",
     "appName": "Testing AI"
   },
@@ -582,6 +583,14 @@
     "inputPlaceholder": "Задайте вопрос...",
     "result": "результат",
     "failedToLoad": "Не удалось загрузить чат"
+  },
+  "help": {
+    "title": "Документация",
+    "subtitle": "Руководство пользователя",
+    "search": "Поиск...",
+    "noResults": "Ничего не найдено",
+    "prevArticle": "Предыдущая",
+    "nextArticle": "Следующая"
   },
   "language": {
     "label": "Язык",

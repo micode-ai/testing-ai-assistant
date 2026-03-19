@@ -51,6 +51,7 @@
     "workspace": "Przestrzeń robocza",
     "selectOrgHint": "Wybierz organizację, aby rozpocząć",
     "projectSection": "Projekt",
+    "help": "Pomoc",
     "notifications": "Powiadomienia",
     "appName": "Testing AI"
   },
@@ -576,6 +577,14 @@
     "inputPlaceholder": "Zadaj pytanie...",
     "result": "wynik",
     "failedToLoad": "Nie udało się załadować czatu"
+  },
+  "help": {
+    "title": "Dokumentacja",
+    "subtitle": "Podręcznik użytkownika",
+    "search": "Szukaj...",
+    "noResults": "Brak wyników",
+    "prevArticle": "Poprzedni",
+    "nextArticle": "Następny"
   },
   "language": {
     "label": "Język",
