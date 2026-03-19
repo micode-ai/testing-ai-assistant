@@ -188,8 +188,25 @@ export class GenerationService {
 
         return this.bugDetectorService.detect({ projectId, context } as any);
       }
-      case GenerationType.FLAKY_DETECT:
-        return this.flakyDetectorService.analyze(input as any);
+      case GenerationType.FLAKY_DETECT: {
+        const flakyCtx = inputContext as Record<string, unknown>;
+        const flakyLocale = (flakyCtx.locale as string) || undefined;
+        let flakyContext;
+
+        if (Array.isArray(flakyCtx.testHistory) && flakyCtx.testHistory.length > 0) {
+          flakyContext = {
+            testHistory: flakyCtx.testHistory,
+            testResults: Array.isArray(flakyCtx.testResults) ? flakyCtx.testResults : [],
+            locale: flakyLocale,
+          };
+        } else {
+          this.logger.log(`Auto-fetching flaky detect history for project ${projectId}`);
+          const autoContext = await this.bugDetectContextService.fetchTestHistory(projectId);
+          flakyContext = { ...autoContext, locale: flakyLocale };
+        }
+
+        return this.flakyDetectorService.analyze({ projectId, context: flakyContext } as any);
+      }
       case GenerationType.COVERAGE_ADVICE:
         return this.coverageAdvisorService.advise(input as any);
       case GenerationType.CHECKLIST_GEN:

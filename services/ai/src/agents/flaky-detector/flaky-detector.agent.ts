@@ -25,6 +25,14 @@ export class FlakyDetectorAgent extends BaseAgent {
     this.graph = this.buildGraph();
   }
 
+  private getLanguageName(locale?: string): string {
+    switch (locale) {
+      case 'ru': return 'Russian';
+      case 'pl': return 'Polish';
+      default: return 'English';
+    }
+  }
+
   private buildGraph() {
     const workflow = new StateGraph(FlakyDetectAnnotation)
       .addNode('statisticalAnalysisNode', this.statisticalAnalysis.bind(this))
@@ -63,11 +71,13 @@ export class FlakyDetectorAgent extends BaseAgent {
     this.logger.debug('Performing statistical analysis on test history...');
 
     const { context } = state.input;
+    const lang = this.getLanguageName(context.locale);
+    const testHistory = Array.isArray(context.testHistory) ? context.testHistory : [];
 
     // Build statistical data from test history
     const testStats: Record<string, { passed: number; failed: number; totalRuns: number; durations: number[] }> = {};
 
-    for (const run of context.testHistory) {
+    for (const run of testHistory) {
       for (const result of run.results) {
         if (!testStats[result.testName]) {
           testStats[result.testName] = { passed: 0, failed: 0, totalRuns: 0, durations: [] };
@@ -103,9 +113,10 @@ export class FlakyDetectorAgent extends BaseAgent {
 
     const response = await this.fastModel.invoke([
       new SystemMessage(
-        'You are a test reliability engineer. Analyze the following statistical data about test flakiness. ' +
-        'Summarize the findings: which tests are most flaky, what the overall flakiness rate is, ' +
-        'and any initial observations about duration variance that might indicate timing issues.',
+        `You are a test reliability engineer. Analyze the following statistical data about test flakiness. ` +
+        `Summarize the findings: which tests are most flaky, what the overall flakiness rate is, ` +
+        `and any initial observations about duration variance that might indicate timing issues. ` +
+        `Write your analysis in ${lang}.`,
       ),
       new HumanMessage(
         `Flaky Tests (score > 0.1):\n${JSON.stringify(flakyTests, null, 2)}\n\n` +
@@ -126,21 +137,25 @@ export class FlakyDetectorAgent extends BaseAgent {
     this.logger.debug('Detecting flakiness patterns...');
 
     const { context } = state.input;
+    const lang = this.getLanguageName(context.locale);
+    const testHistory = Array.isArray(context.testHistory) ? context.testHistory : [];
+    const testResults = Array.isArray(context.testResults) ? context.testResults : [];
     const response = await this.model.invoke([
       new SystemMessage(
-        'You are an expert at identifying flaky test patterns. Based on the statistical analysis ' +
-        'and test history, detect patterns that cause flakiness:\n' +
-        '- Timing-dependent: Tests that rely on specific timing or timeouts\n' +
-        '- Order-dependent: Tests that pass/fail based on execution order\n' +
-        '- Environment-dependent: Tests affected by system state, file system, network\n' +
-        '- Race conditions: Tests with concurrent access issues\n\n' +
-        'For each flaky test, identify the most likely pattern and explain why.',
+        `You are an expert at identifying flaky test patterns. Based on the statistical analysis ` +
+        `and test history, detect patterns that cause flakiness:\n` +
+        `- Timing-dependent: Tests that rely on specific timing or timeouts\n` +
+        `- Order-dependent: Tests that pass/fail based on execution order\n` +
+        `- Environment-dependent: Tests affected by system state, file system, network\n` +
+        `- Race conditions: Tests with concurrent access issues\n\n` +
+        `For each flaky test, identify the most likely pattern and explain why. ` +
+        `Write your analysis in ${lang}.`,
       ),
       new HumanMessage(
         `Statistical Analysis:\n${state.statisticalAnalysis}\n\n` +
-        `Test History (last ${context.testHistory.length} runs):\n` +
-        JSON.stringify(context.testHistory.slice(0, 5), null, 2) +
-        `\n\nCurrent Test Results:\n${JSON.stringify(context.testResults, null, 2)}`,
+        `Test History (last ${testHistory.length} runs):\n` +
+        JSON.stringify(testHistory.slice(0, 5), null, 2) +
+        `\n\nCurrent Test Results:\n${JSON.stringify(testResults, null, 2)}`,
       ),
     ]);
 
@@ -155,14 +170,31 @@ export class FlakyDetectorAgent extends BaseAgent {
   private async generateRecommendations(state: FlakyDetectGraphState): Promise<Partial<FlakyDetectGraphState>> {
     this.logger.debug('Generating flaky test recommendations...');
 
+    const lang = this.getLanguageName(state.input.context.locale);
     const response = await this.model.invoke([
       new SystemMessage(
-        'You are a test reliability engineer generating actionable recommendations. ' +
-        'Based on the analysis, generate a JSON report:\n' +
-        '{ "flakyTests": [{ "testName": "...", "flakinessScore": 0.0-1.0, ' +
-        '"pattern": "timing-dependent|order-dependent|environment-dependent|race-condition|unknown", ' +
-        '"recommendation": "specific fix suggestion" }], ' +
-        '"summary": "overall summary of findings and top priorities" }',
+        `You are a test reliability engineer writing a report for a general audience (not just developers). ` +
+        `Based on the analysis, generate a JSON report:\n` +
+        `{\n` +
+        `  "flakyTests": [{\n` +
+        `    "testName": "name of the test or test step",\n` +
+        `    "flakinessScore": 0.0-1.0,\n` +
+        `    "failRate": 0.0-1.0,\n` +
+        `    "pattern": "timing-dependent|order-dependent|environment-dependent|race-condition|unknown",\n` +
+        `    "patternLabel": "human-readable pattern name",\n` +
+        `    "description": "clear explanation of why this test is flaky, understandable by non-developers",\n` +
+        `    "impact": "what happens when this test is flaky — e.g. false CI failures, wasted developer time",\n` +
+        `    "recommendation": "specific actionable steps to fix"\n` +
+        `  }],\n` +
+        `  "summary": "brief overview of findings for a project manager",\n` +
+        `  "totalAnalyzed": number,\n` +
+        `  "flakyCount": number,\n` +
+        `  "stableCount": number,\n` +
+        `  "overallHealthScore": 0-100\n` +
+        `}\n` +
+        `IMPORTANT: Write ALL text fields (patternLabel, description, impact, recommendation, summary) in ${lang}. ` +
+        `Keep only testName, pattern (enum value), and JSON keys in English.\n` +
+        `Order flaky tests by flakinessScore descending (most flaky first).`,
       ),
       new HumanMessage(
         `Statistical Analysis:\n${state.statisticalAnalysis}\n\n` +

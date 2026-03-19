@@ -61,4 +61,17 @@ export class TestRunRepository {
       include: { results: true },
     });
   }
+
+  async findRecentCompletedByPipelineIds(pipelineIds: string[], limit = 10) {
+    if (pipelineIds.length === 0) return [];
+    return this.prisma.testRun.findMany({
+      where: {
+        pipelineId: { in: pipelineIds },
+        status: { in: ['PASSED', 'FAILED'] },
+      },
+      orderBy: { finishedAt: 'desc' },
+      take: limit,
+      include: { results: true },
+    });
+  }
 }

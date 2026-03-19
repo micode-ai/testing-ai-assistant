@@ -338,7 +338,9 @@
     "model": "Модель:",
     "feedback": "Отзыв (необязательно)",
     "feedbackPlaceholder": "Оставьте отзыв о этой генерации...",
-    "feedbackSubmitted": "Отзыв отправлен. Эта генерация была {status}."
+    "feedbackSubmitted": "Отзыв отправлен. Эта генерация была {status}.",
+    "feedbackAccepted": "Отзыв отправлен. Генерация принята.",
+    "feedbackRejected": "Отзыв отправлен. Генерация отклонена."
   },
   "testWizard": {
     "title": "AI-генератор тестов",

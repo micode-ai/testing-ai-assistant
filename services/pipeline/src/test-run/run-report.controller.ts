@@ -34,6 +34,33 @@ export class RunReportController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Get('by-project/:projectId/history')
+  @ApiOperation({ summary: 'Get recent completed runs with results for a project (internal)' })
+  async getHistoryByProject(@Param('projectId') projectId: string) {
+    const pipelines = await this.pipelineRepository.findByProjectId(projectId);
+    if (pipelines.length === 0) {
+      return [];
+    }
+
+    const pipelineIds = pipelines.map((p) => p.id);
+    const runs = await this.testRunRepository.findRecentCompletedByPipelineIds(pipelineIds, 10);
+
+    return runs.map((run) => ({
+      runId: run.id,
+      status: run.status,
+      branch: (run as any).branch,
+      commitSha: (run as any).commitSha,
+      finishedAt: run.finishedAt,
+      results: ((run as any).results || []).map((r: any) => ({
+        checkType: r.checkType,
+        status: r.status,
+        summary: r.summary,
+        details: r.details,
+        durationMs: r.durationMs,
+      })),
+    }));
+  }
+
   @Get('by-project/:projectId/latest')
   @ApiOperation({ summary: 'Get latest completed run with results for a project (internal)' })
   async getLatestByProject(@Param('projectId') projectId: string) {

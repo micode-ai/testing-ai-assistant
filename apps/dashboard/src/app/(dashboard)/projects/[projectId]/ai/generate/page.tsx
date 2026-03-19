@@ -17,6 +17,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
 import { BugReportView } from '@/components/shared/bug-report-view';
+import { FlakyReportView } from '@/components/shared/flaky-report-view';
 import { triggerGeneration, submitFeedback } from '@/lib/api/ai';
 import type { AIGeneration, GenerationType } from '@/types';
 
@@ -68,9 +69,9 @@ export default function GeneratePage() {
         }
         return { locale };
       case 'FLAKY_DETECT':
-        return { autoLoadHistory: true };
+        return { locale };
       case 'COVERAGE_ADVICE':
-        return { autoLoadCoverage: true };
+        return { locale };
       default:
         return {};
     }
@@ -289,6 +290,8 @@ export default function GeneratePage() {
           <CardContent className="space-y-4">
             {result.type === 'BUG_DETECT' ? (
               <BugReportView output={result.output} />
+            ) : result.type === 'FLAKY_DETECT' ? (
+              <FlakyReportView output={result.output} />
             ) : (
               <div className="rounded-md bg-muted p-4 overflow-x-auto">
                 <pre className="text-sm">
@@ -344,8 +347,7 @@ export default function GeneratePage() {
             {/* Feedback submitted confirmation */}
             {feedbackSubmitted && (
               <div className="rounded-md bg-green-50 border border-green-200 p-4 text-sm text-green-800">
-                {t('aiGenerate.feedbackSubmitted')}{' '}
-                {result.accepted ? t('common.accepted') : t('common.rejected')}.
+                {result.accepted ? t('aiGenerate.feedbackAccepted') : t('aiGenerate.feedbackRejected')}
               </div>
             )}
           </CardContent>

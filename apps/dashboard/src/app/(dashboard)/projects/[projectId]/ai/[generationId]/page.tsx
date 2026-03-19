@@ -20,6 +20,7 @@ import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
 import { getGeneration, submitFeedback } from '@/lib/api/ai';
 import { PageSkeleton } from '@/components/shared/page-skeleton';
 import { BugReportView } from '@/components/shared/bug-report-view';
+import { FlakyReportView } from '@/components/shared/flaky-report-view';
 import type { AIGeneration } from '@/types';
 
 export default function GenerationDetailPage() {
@@ -173,6 +174,8 @@ export default function GenerationDetailPage() {
         <CardContent>
           {generation.type === 'BUG_DETECT' ? (
             <BugReportView output={generation.output} />
+          ) : generation.type === 'FLAKY_DETECT' ? (
+            <FlakyReportView output={generation.output} />
           ) : (
             <div className="rounded-md bg-muted p-4 overflow-x-auto">
               <pre className="text-sm">

@@ -74,6 +74,7 @@ export interface FlakyDetectInput extends AgentInput {
   context: {
     testHistory: TestRunHistory[];
     testResults: TestResultEntry[];
+    locale?: string;
   };
 }
 

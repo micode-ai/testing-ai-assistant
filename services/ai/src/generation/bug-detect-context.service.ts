@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GitAdapterFactory, RepoProvider } from '../git-adapter';
 import type { GitAdapter } from '../git-adapter';
-import type { TestResultEntry } from '../agents/types';
+import type { TestResultEntry, TestRunHistory } from '../agents/types';
 
 interface ProjectInfo {
   id: string;
@@ -174,6 +174,46 @@ export class BugDetectContextService {
     } catch (error) {
       this.logger.warn(`Failed to fetch test results: ${(error as Error).message}`);
       return [];
+    }
+  }
+
+  async fetchTestHistory(projectId: string): Promise<{ testHistory: TestRunHistory[]; testResults: TestResultEntry[] }> {
+    try {
+      const response = await fetch(
+        `${this.pipelineServiceUrl}/api/v1/runs/by-project/${projectId}/history`,
+      );
+
+      if (!response.ok) {
+        this.logger.warn(`Pipeline history returned ${response.status} for project ${projectId}`);
+        return { testHistory: [], testResults: [] };
+      }
+
+      const runs = await response.json() as PipelineRunResult[];
+      if (!Array.isArray(runs) || runs.length === 0) {
+        return { testHistory: [], testResults: [] };
+      }
+
+      const testHistory: TestRunHistory[] = runs.map((run) => ({
+        runId: run.runId,
+        timestamp: run.finishedAt,
+        results: (run.results || []).map((r) => ({
+          testName: r.checkType,
+          status: this.mapStatus(r.status),
+          duration: r.durationMs,
+          errorMessage: r.status === 'FAILED' ? r.summary : undefined,
+          errorStack: r.status === 'FAILED' && r.details?.stack
+            ? String(r.details.stack)
+            : undefined,
+        })),
+      }));
+
+      // Latest run's results as current testResults
+      const testResults = testHistory.length > 0 ? testHistory[0].results : [];
+
+      return { testHistory, testResults };
+    } catch (error) {
+      this.logger.warn(`Failed to fetch test history: ${(error as Error).message}`);
+      return { testHistory: [], testResults: [] };
     }
   }
 

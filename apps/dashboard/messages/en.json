@@ -338,7 +338,9 @@
     "model": "Model:",
     "feedback": "Feedback (optional)",
     "feedbackPlaceholder": "Provide optional feedback about this generation...",
-    "feedbackSubmitted": "Feedback submitted. This generation was {status}."
+    "feedbackSubmitted": "Feedback submitted. This generation was {status}.",
+    "feedbackAccepted": "Feedback submitted. Generation accepted.",
+    "feedbackRejected": "Feedback submitted. Generation rejected."
   },
   "testWizard": {
     "title": "AI Test Generator",

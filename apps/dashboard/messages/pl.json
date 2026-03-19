@@ -338,7 +338,9 @@
     "model": "Model:",
     "feedback": "Opinia (opcjonalnie)",
     "feedbackPlaceholder": "Podaj opcjonalną opinię o tej generacji...",
-    "feedbackSubmitted": "Opinia wysłana. Ta generacja została {status}."
+    "feedbackSubmitted": "Opinia wysłana. Ta generacja została {status}.",
+    "feedbackAccepted": "Opinia wysłana. Generacja zaakceptowana.",
+    "feedbackRejected": "Opinia wysłana. Generacja odrzucona."
   },
   "testWizard": {
     "title": "Generator testów AI",
