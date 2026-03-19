@@ -9,6 +9,7 @@ export class CreateChecklistItemDto {
   @ApiPropertyOptional() @IsOptional() @IsEnum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']) priority?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) order?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() generatedTestCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() section?: string;
 }
 
 export class CreateChecklistDto {

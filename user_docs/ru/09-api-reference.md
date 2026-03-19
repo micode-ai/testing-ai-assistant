@@ -225,6 +225,31 @@ http://localhost/api/<service>
 | `GET` | `/test-runs/:id` | Детали прогона |
 | `POST` | `/test-runs/:id/cancel` | Отменить прогон |
 
+### Сообщения AI-чата для пунктов чек-листа
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET` | `/checklists/:id/items/:itemId/messages` | Получить историю сообщений AI-чата для пункта |
+| `POST` | `/checklists/:id/items/:itemId/messages` | Отправить сообщение в AI-чат пункта чек-листа |
+
+#### POST /checklists/:id/items/:itemId/messages
+
+```json
+// Запрос
+{
+  "content": "Как лучше протестировать этот сценарий?"
+}
+
+// Ответ 201
+{
+  "id": "uuid",
+  "checklistItemId": "uuid",
+  "role": "USER",
+  "content": "Как лучше протестировать этот сценарий?",
+  "createdAt": "2026-03-19T10:00:00Z"
+}
+```
+
 #### POST /test-runs
 
 ```json

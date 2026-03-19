@@ -225,6 +225,13 @@ Internal endpoint (no JWT required). Used by the dashboard to resolve user IDs t
 | `GET` | `/test-runs/:id` | Run details |
 | `POST` | `/test-runs/:id/cancel` | Cancel run |
 
+### Checklist Item Messages
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/checklists/:id/items/:itemId/messages` | List messages for a checklist item |
+| `POST` | `/checklists/:id/items/:itemId/messages` | Send message; AI responds |
+
 #### POST /test-runs
 
 ```json
@@ -254,7 +261,7 @@ Internal endpoint (no JWT required). Used by the dashboard to resolve user IDs t
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/ai/generate` | Start generation |
+| `POST` | `/ai/generate` | Start generation (types: `TEST_GENERATION`, `CHECKLIST_ITEM_CHAT`, etc.) |
 | `GET` | `/ai/generations?projectId=<id>&type=<type>` | List generations |
 | `GET` | `/ai/generations/:id` | Generation details |
 | `PATCH` | `/ai/generations/:id/feedback` | Provide feedback |

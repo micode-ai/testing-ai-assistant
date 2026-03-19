@@ -161,6 +161,13 @@ Gateway prefix: `/api/pipeline`
 | `GET` | `/test-runs/:id` | Bearer JWT | Get test run with results |
 | `POST` | `/test-runs/:id/cancel` | Bearer JWT | Cancel a test run |
 
+### Checklist Item Messages
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/checklists/:id/items/:itemId/messages` | Bearer JWT | List messages for a checklist item |
+| `POST` | `/checklists/:id/items/:itemId/messages` | Bearer JWT | Send message to per-item AI chat; AI responds |
+
 ---
 
 ## AI Service (port 3005)
@@ -169,7 +176,7 @@ Gateway prefix: `/api/ai`
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/ai/generate` | Bearer JWT | Trigger an AI generation |
+| `POST` | `/ai/generate` | Bearer JWT | Trigger an AI generation (types: `TEST_GENERATION`, `CHECKLIST_ITEM_CHAT`, etc.) |
 | `GET` | `/ai/generations?projectId=<id>&type=<type>` | Bearer JWT | List generations for a project |
 | `GET` | `/ai/generations/stats?projectId=<id>` | Bearer JWT | Get generation statistics |
 | `GET` | `/ai/generations/:id` | Bearer JWT | Get generation details |

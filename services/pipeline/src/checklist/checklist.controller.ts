@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ChecklistService } from './checklist.service';
 import { CreateChecklistDto, CreateChecklistItemDto } from './dto/create-checklist.dto';
 import { UpdateChecklistDto, UpdateChecklistItemDto } from './dto/update-checklist.dto';
-import { ChecklistExportDto, ChecklistResponseDto } from './dto/checklist-response.dto';
+import { ChecklistExportDto, ChecklistResponseDto, SendItemMessageDto, ItemMessageResponseDto } from './dto/checklist-response.dto';
 
 @ApiTags('checklists')
 @ApiBearerAuth()
@@ -73,6 +73,24 @@ export class ChecklistController {
   @ApiOperation({ summary: 'Reorder checklist items' })
   async reorderItems(@Param('id') id: string, @Body() body: { itemIds: string[] }) {
     return this.checklistService.reorderItems(id, body.itemIds);
+  }
+
+  // --- Item Messages ---
+
+  @Get(':id/items/:itemId/messages')
+  @ApiOperation({ summary: 'List messages for a checklist item' })
+  async getItemMessages(@Param('itemId') itemId: string) {
+    return this.checklistService.getItemMessages(itemId);
+  }
+
+  @Post(':id/items/:itemId/messages')
+  @ApiOperation({ summary: 'Send message to AI about a checklist item' })
+  async sendItemMessage(
+    @Param('id') checklistId: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: SendItemMessageDto,
+  ) {
+    return this.checklistService.sendItemMessage(checklistId, itemId, dto.content);
   }
 
   // --- Import/Export ---

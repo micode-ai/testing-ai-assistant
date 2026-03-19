@@ -322,6 +322,8 @@ flowchart LR
 | **Artifacts Viewer** | Browse screenshots, videos, and coverage reports from MinIO |
 | **AI Generations** | List of AI generations with accept/reject actions and feedback |
 | **AI Generate** | Form to trigger a new AI generation with type and context selection |
+| **Checklists List** | All checklists for a project; "Generate with AI" button to create a checklist via AI |
+| **Checklist Detail** | Collapsible sections with completion progress (e.g. 2/5), completion checkboxes, per-item notes, and per-item AI chat |
 | **AI Chat** | Conversational AI assistant with tool calling, RAG knowledge base, streaming responses |
 | **Coverage Dashboard** | Line/branch/function coverage charts with historical trends |
 | **Notification Settings** | Configure notification channels per organization and event type |

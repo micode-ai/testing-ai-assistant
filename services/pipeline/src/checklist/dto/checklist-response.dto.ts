@@ -9,6 +9,10 @@ export class ChecklistItemResponseDto {
   @ApiProperty() priority: string;
   @ApiProperty() order: number;
   @ApiPropertyOptional() generatedTestCode: string | null;
+  @ApiProperty() section: string;
+  @ApiProperty() isCompleted: boolean;
+  @ApiPropertyOptional() note: string | null;
+  @ApiPropertyOptional() noteUpdatedAt: Date | null;
   @ApiProperty() createdAt: Date;
   @ApiProperty() updatedAt: Date;
 }
@@ -61,5 +65,18 @@ export class ChecklistExportDto {
     expectedBehavior: string;
     priority: string;
     generatedTestCode: string | null;
+    section: string;
   }[];
+}
+
+export class SendItemMessageDto {
+  @ApiProperty() content: string;
+}
+
+export class ItemMessageResponseDto {
+  @ApiProperty() id: string;
+  @ApiProperty() itemId: string;
+  @ApiProperty() role: string;
+  @ApiProperty() content: string;
+  @ApiProperty() createdAt: Date;
 }

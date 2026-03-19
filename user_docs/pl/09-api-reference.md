@@ -227,6 +227,13 @@ http://localhost/api/<service>
 | `GET` | `/test-runs/:id` | Szczegóły przebiegu |
 | `POST` | `/test-runs/:id/cancel` | Anulowanie przebiegu |
 
+### Wiadomosci czatu elementow checklisty
+
+| Metoda | Sciezka | Opis |
+|--------|---------|------|
+| `GET` | `/checklists/:id/items/:itemId/messages` | Pobranie wiadomosci czatu dla elementu checklisty |
+| `POST` | `/checklists/:id/items/:itemId/messages` | Wyslanie wiadomosci czatu dla elementu checklisty |
+
 #### POST /test-runs
 
 ```json

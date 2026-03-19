@@ -71,6 +71,14 @@ Kliknij na awatar w prawym górnym rogu i wybierz „Wyloguj się". Token zostan
 - **Historia konwersacji** — poprzednie czaty są zapisywane i dostępne z bocznego panelu
 - **Strumieniowe odpowiedzi** — wyświetlanie odpowiedzi w czasie rzeczywistym znak po znaku
 
+### Listy kontrolne
+
+- **Sekcje** — checklisty sa podzielone na sekcje tematyczne
+- **Oznaczanie elementow** — checkbox do zaznaczania wykonanych pozycji
+- **Notatki** — mozliwosc dodania notatek do kazdego elementu
+- **Czat AI per element** — kontekstowy czat AI dostepny dla kazdej pozycji checklisty
+- **Generowanie z AI** — przycisk "Generuj z AI" tworzy checkliste na podstawie kontekstu projektu
+
 ### Pokrycie kodu
 
 - **Migawki pokrycia** — procent pokrycia na przebieg
@@ -112,7 +120,7 @@ Menu boczne jest wielopoziomowe — widoczne sekcje zależą od kontekstu:
 - **Czat AI** — konwersacyjny asystent AI
 - **Potoki** — pipeline'y testowe
 - **Pokrycie** — pokrycie kodu
-- **Listy kontrolne** — checklisty testowe
+- **Listy kontrolne** — checklisty testowe (sekcje, oznaczanie elementow, notatki, czat AI per element)
 - **Centrum AI** — generowanie i analiza AI
 
 Przełącznik organizacji (OrgSwitcher) po wybraniu organizacji automatycznie nawiguje do strony `/projects`. Karty organizacji po kliknięciu przechodzą do strony szczegółów organizacji, a licznik członków prowadzi do `/organizations/{id}/members`.

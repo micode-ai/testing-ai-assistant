@@ -50,6 +50,10 @@ export interface ChecklistItem {
   expectedBehavior: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   order: number;
+  section: string;
+  isCompleted: boolean;
+  note: string | null;
+  noteUpdatedAt: string | null;
   generatedTestCode: string | null;
   createdAt: string;
   updatedAt: string;
@@ -102,8 +106,17 @@ export interface ChecklistExport {
     description: string;
     expectedBehavior: string;
     priority: string;
+    section?: string;
     generatedTestCode: string | null;
   }[];
+}
+
+export interface ItemMessage {
+  id: string;
+  itemId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
 }
 
 // --- API ---
@@ -213,4 +226,16 @@ export async function triggerChecklistRun(checklistId: string, targetUrl: string
 
 export async function getChecklistRun(runId: string, token?: string): Promise<ChecklistRun> {
   return checklistClient<ChecklistRun>(`/checklist-runs/${runId}`, { token });
+}
+
+export async function getItemMessages(checklistId: string, itemId: string, token: string): Promise<ItemMessage[]> {
+  return checklistClient<ItemMessage[]>(`/checklists/${checklistId}/items/${itemId}/messages`, { token });
+}
+
+export async function sendItemMessage(checklistId: string, itemId: string, content: string, token: string): Promise<ItemMessage> {
+  return checklistClient<ItemMessage>(`/checklists/${checklistId}/items/${itemId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+    token,
+  });
 }

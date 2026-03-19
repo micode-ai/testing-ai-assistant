@@ -71,6 +71,15 @@ Click on the avatar in the top right corner and select "Sign Out". The token wil
 - **Conversation history** — past chats are saved and accessible from the sidebar
 - **Streaming responses** — real-time character-by-character response display
 
+### Checklists
+
+- **Checklists list** — all checklists for the current project
+- **Generate with AI** — click the "Generate with AI" button on the list page to create a checklist via AI; the AI generates items grouped into 3-7 sections
+- **Collapsible sections** — checklist items are organized into named sections; each section header shows completion progress (e.g. 2/5) and collapses/expands
+- **Completion checkboxes** — mark individual items as completed; a section is marked done when all its items are completed
+- **Notes** — add free-text notes to any checklist item (tracked with a `noteUpdatedAt` timestamp)
+- **Per-item AI chat** — open an AI chat for any individual checklist item to ask questions or get guidance
+
 ### Code Coverage
 
 - **Coverage snapshots** — coverage percentage per run

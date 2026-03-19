@@ -129,14 +129,31 @@ model ChecklistItem {
   expectedBehavior  String                @default("") @map("expected_behavior")
   priority          ChecklistItemPriority @default(MEDIUM)
   order             Int                   @default(0)
+  section           String                @default("")
+  isCompleted       Boolean               @default(false) @map("is_completed")
+  note              String?               @db.Text
+  noteUpdatedAt     DateTime?             @map("note_updated_at")
   generatedTestCode String?               @map("generated_test_code") @db.Text
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
   checklist         Checklist             @relation(fields: [checklistId], references: [id], onDelete: Cascade)
   results           ChecklistItemResult[]
+  messages          ChecklistItemMessage[]
 
   @@index([checklistId])
   @@map("checklist_items")
+}
+
+model ChecklistItemMessage {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  itemId    String   @map("item_id")
+  role      String
+  content   String   @db.Text
+  item      ChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@map("checklist_item_messages")
 }
 
 model ChecklistRun {

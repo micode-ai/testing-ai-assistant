@@ -7,6 +7,7 @@ import { ChecklistGeneratorService } from './checklist-generator/checklist-gener
 import { ChecklistTestGeneratorService } from './checklist-test-generator/checklist-test-generator.service';
 import { ProjectAnalyzerService } from './project-analyzer/project-analyzer.service';
 import { TestProposerService } from './test-proposer/test-proposer.service';
+import { ChecklistItemChatService } from './checklist-item-chat/checklist-item-chat.service';
 
 @Module({
   providers: [
@@ -18,6 +19,7 @@ import { TestProposerService } from './test-proposer/test-proposer.service';
     ChecklistTestGeneratorService,
     ProjectAnalyzerService,
     TestProposerService,
+    ChecklistItemChatService,
   ],
   exports: [
     TestGeneratorService,
@@ -28,6 +30,7 @@ import { TestProposerService } from './test-proposer/test-proposer.service';
     ChecklistTestGeneratorService,
     ProjectAnalyzerService,
     TestProposerService,
+    ChecklistItemChatService,
   ],
 })
 export class AgentsModule {}

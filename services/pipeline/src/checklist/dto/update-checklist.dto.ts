@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class UpdateChecklistDto {
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
@@ -13,4 +13,7 @@ export class UpdateChecklistItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() expectedBehavior?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() priority?: string;
   @ApiPropertyOptional() @IsOptional() generatedTestCode?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsString() section?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() note?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isCompleted?: boolean;
 }

@@ -1,16 +1,19 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useTranslations } from 'next-intl';
 import {
   Play, Plus, Trash2, Download, Sparkles, ChevronDown, ChevronRight,
-  GripVertical, Code2, CheckCircle2,
+  GripVertical, Code2, CheckCircle2, MessageSquare, Loader2, Send,
+  ArrowLeft,
 } from 'lucide-react';
 import {
-  getChecklist, updateChecklist, addChecklistItem, updateChecklistItem,
+  getChecklist, updateChecklist, deleteChecklist, addChecklistItem, updateChecklistItem,
   deleteChecklistItem, exportChecklist, triggerChecklistRun,
-  type Checklist, type ChecklistItem,
+  getItemMessages, sendItemMessage,
+  type Checklist, type ChecklistItem, type ItemMessage,
 } from '@/lib/api/checklists';
 import { triggerGeneration } from '@/lib/api/ai';
 import { Button } from '@/components/ui/button';
@@ -19,6 +22,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import { PageSkeleton } from '@/components/shared/page-skeleton';
 
 const priorityColors: Record<string, string> = {
@@ -28,19 +34,42 @@ const priorityColors: Record<string, string> = {
   CRITICAL: 'bg-priority-critical-bg text-priority-critical-fg',
 };
 
+interface SectionGroup {
+  section: string;
+  items: ChecklistItem[];
+}
+
+function groupBySection(items: ChecklistItem[]): SectionGroup[] {
+  const groups = new Map<string, ChecklistItem[]>();
+  for (const item of items) {
+    const key = item.section || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(item);
+  }
+  return Array.from(groups.entries()).map(([section, items]) => ({ section, items }));
+}
+
+function hasSections(items: ChecklistItem[]): boolean {
+  return items.some((item) => item.section && item.section.length > 0);
+}
+
 export default function ChecklistDetailPage() {
   const params = useParams<{ projectId: string; checklistId: string }>();
   const router = useRouter();
   const { data: session } = useSession();
+  const t = useTranslations('checklists');
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
 
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [runUrl, setRunUrl] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [generatingItems, setGeneratingItems] = useState<Set<string>>(new Set());
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchChecklist = useCallback(async () => {
     if (!token) return;
@@ -76,6 +105,18 @@ export default function ChecklistDetailPage() {
     fetchChecklist();
   }
 
+  async function onDeleteChecklist() {
+    if (!token || !checklist) return;
+    setIsDeleting(true);
+    try {
+      await deleteChecklist(checklist.id, token);
+      router.push(`/projects/${params.projectId}/checklists`);
+    } catch {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  }
+
   async function onExport() {
     if (!token || !checklist) return;
     const data = await exportChecklist(checklist.id, token);
@@ -105,21 +146,14 @@ export default function ChecklistDetailPage() {
     try {
       const result = await triggerGeneration({
         projectId: params.projectId,
-        type: 'CHECKLIST_TEST_GEN' as any,
+        type: 'CHECKLIST_TEST_GEN',
         inputContext: {
-          checklistItem: {
-            title: item.title,
-            description: item.description,
-            expectedBehavior: item.expectedBehavior,
-          },
+          checklistItem: { title: item.title, description: item.description, expectedBehavior: item.expectedBehavior },
           targetUrl: checklist.targetUrl || runUrl,
           framework: 'playwright',
         },
       }, token);
-      // Save generated code to the item
-      await updateChecklistItem(checklist.id, item.id, {
-        generatedTestCode: result.output,
-      }, token);
+      await updateChecklistItem(checklist.id, item.id, { generatedTestCode: result.output }, token);
       fetchChecklist();
     } catch {
       // handle error
@@ -144,24 +178,49 @@ export default function ChecklistDetailPage() {
   function toggleExpand(id: string) {
     setExpandedItems((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
 
-  if (isLoading) {
-    return <PageSkeleton cards={4} />;
+  function toggleSection(section: string) {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section); else next.add(section);
+      return next;
+    });
   }
 
-  if (!checklist) {
-    return <p className="text-muted-foreground text-center py-12">Checklist not found</p>;
+  function toggleAllSections() {
+    if (!checklist) return;
+    const sections = groupBySection(checklist.items);
+    const allCollapsed = sections.every((s) => collapsedSections.has(s.section));
+    if (allCollapsed) {
+      setCollapsedSections(new Set());
+    } else {
+      setCollapsedSections(new Set(sections.map((s) => s.section)));
+    }
   }
+
+  if (isLoading) return <PageSkeleton cards={4} />;
+  if (!checklist) return <p className="text-muted-foreground text-center py-12">{t('notFound')}</p>;
 
   const itemsWithTests = checklist.items.filter((i) => i.generatedTestCode).length;
+  const useSections = hasSections(checklist.items);
+  const sections = useSections ? groupBySection(checklist.items) : [];
 
   return (
     <div className="space-y-6">
+      {/* Back link */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground"
+        onClick={() => router.push(`/projects/${params.projectId}/checklists`)}
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" /> {t('backToList')}
+      </Button>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -170,10 +229,18 @@ export default function ChecklistDetailPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onExport}>
-            <Download className="mr-1 h-4 w-4" /> Export
+            <Download className="mr-1 h-4 w-4" /> {t('export')}
           </Button>
           <Button variant="outline" size="sm" onClick={onGenerateAllTests}>
-            <Sparkles className="mr-1 h-4 w-4" /> Generate All Tests
+            <Sparkles className="mr-1 h-4 w-4" /> {t('generateAllTests')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <Trash2 className="mr-1 h-4 w-4" /> {t('delete')}
           </Button>
         </div>
       </div>
@@ -182,125 +249,414 @@ export default function ChecklistDetailPage() {
       <Card>
         <CardContent className="flex items-end gap-3 pt-4">
           <div className="flex-1 space-y-1">
-            <Label className="text-xs">Target URL</Label>
-            <Input
-              placeholder="https://myapp.example.com"
-              value={runUrl}
-              onChange={(e) => setRunUrl(e.target.value)}
-            />
+            <Label className="text-xs">{t('targetUrl')}</Label>
+            <Input placeholder="https://myapp.example.com" value={runUrl} onChange={(e) => setRunUrl(e.target.value)} />
           </div>
           <Button onClick={onRun} disabled={isRunning || !runUrl || itemsWithTests === 0}>
             <Play className="mr-2 h-4 w-4" />
-            {isRunning ? 'Starting...' : `Run Checklist (${itemsWithTests}/${checklist.items.length} tests)`}
+            {isRunning ? t('starting') : t('runChecklist', { tests: itemsWithTests, total: checklist.items.length })}
           </Button>
         </CardContent>
       </Card>
 
       <Separator />
 
-      {/* Items */}
+      {/* Items header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold">Items ({checklist.items.length})</h3>
-        <Button variant="outline" size="sm" onClick={onAddItem}>
-          <Plus className="mr-1 h-3 w-3" /> Add Item
-        </Button>
+        <h3 className="text-xl font-semibold">{t('itemsCount', { count: checklist.items.length })}</h3>
+        <div className="flex gap-2">
+          {useSections && (
+            <Button variant="ghost" size="sm" onClick={toggleAllSections}>
+              {sections.every((s) => collapsedSections.has(s.section)) ? t('expandAll') : t('collapseAll')}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={onAddItem}>
+            <Plus className="mr-1 h-3 w-3" /> {t('addItem')}
+          </Button>
+        </div>
       </div>
 
-      <div className="space-y-2">
-        {checklist.items.map((item) => {
-          const isExpanded = expandedItems.has(item.id);
-          const isEditing = editingItem === item.id;
-          const isGenerating = generatingItems.has(item.id);
-          const hasTest = !!item.generatedTestCode;
-
-          return (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
-              <CardHeader
-                className="py-3 cursor-pointer"
-                role="button"
-                tabIndex={0}
-                onClick={() => toggleExpand(item.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleExpand(item.id);
-                  }
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    <div>
-                      <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-                      {item.expectedBehavior && (
-                        <p className="text-xs text-muted-foreground">{item.expectedBehavior}</p>
-                      )}
-                    </div>
+      {/* Sectioned display */}
+      {useSections ? (
+        <div className="space-y-4">
+          {sections.map((group) => {
+            const sectionLabel = group.section || t('generalSection');
+            const isCollapsed = collapsedSections.has(group.section);
+            const completedCount = group.items.filter((i) => i.isCompleted).length;
+            const allCompleted = group.items.length > 0 && completedCount === group.items.length;
+            return (
+              <div key={group.section} className={allCompleted ? 'opacity-60' : ''}>
+                <button
+                  onClick={() => toggleSection(group.section)}
+                  className="flex items-center gap-2 w-full text-left px-1 py-2 hover:bg-accent rounded-lg transition-colors cursor-pointer"
+                >
+                  {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {allCompleted && <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />}
+                  <span className={`text-sm font-semibold ${allCompleted ? 'line-through text-muted-foreground' : ''}`}>{sectionLabel}</span>
+                  <Badge variant={allCompleted ? 'default' : 'secondary'} className={`text-xs ${allCompleted ? 'bg-green-600' : ''}`}>
+                    {completedCount}/{group.items.length}
+                  </Badge>
+                </button>
+                {!isCollapsed && (
+                  <div className="space-y-2 ml-6 mt-1">
+                    {group.items.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        checklist={checklist}
+                        token={token}
+                        isExpanded={expandedItems.has(item.id)}
+                        isEditing={editingItem === item.id}
+                        isGenerating={generatingItems.has(item.id)}
+                        onToggleExpand={() => toggleExpand(item.id)}
+                        onEdit={() => setEditingItem(item.id)}
+                        onCancelEdit={() => setEditingItem(null)}
+                        onUpdateItem={onUpdateItem}
+                        onDeleteItem={onDeleteItem}
+                        onGenerateTest={() => onGenerateTest(item)}
+                        onNoteUpdate={fetchChecklist}
+                        t={t}
+                      />
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={priorityColors[item.priority]}>{item.priority}</Badge>
-                    {hasTest && <Code2 className="h-4 w-4 text-green-600" />}
-                  </div>
-                </div>
-              </CardHeader>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Flat display (backward compat) */
+        <div className="space-y-2">
+          {checklist.items.map((item) => (
+            <ItemCard
+              key={item.id}
+              item={item}
+              checklist={checklist}
+              token={token}
+              isExpanded={expandedItems.has(item.id)}
+              isEditing={editingItem === item.id}
+              isGenerating={generatingItems.has(item.id)}
+              onToggleExpand={() => toggleExpand(item.id)}
+              onEdit={() => setEditingItem(item.id)}
+              onCancelEdit={() => setEditingItem(null)}
+              onUpdateItem={onUpdateItem}
+              onDeleteItem={onDeleteItem}
+              onGenerateTest={() => onGenerateTest(item)}
+              onNoteUpdate={fetchChecklist}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
 
-              {isExpanded && (
-                <CardContent className="pt-0 space-y-3">
-                  {isEditing ? (
-                    <EditItemForm
-                      item={item}
-                      onSave={(data) => onUpdateItem(item.id, data)}
-                      onCancel={() => setEditingItem(null)}
-                    />
-                  ) : (
-                    <>
-                      {item.description && <p className="text-sm">{item.description}</p>}
-
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setEditingItem(item.id); }}>
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline" size="sm"
-                          onClick={(e) => { e.stopPropagation(); onGenerateTest(item); }}
-                          disabled={isGenerating}
-                          aria-label={isGenerating ? 'Generating test' : hasTest ? 'Regenerate test' : 'Generate test'}
-                        >
-                          <Sparkles className="mr-1 h-3 w-3" />
-                          {isGenerating ? 'Generating...' : hasTest ? 'Regenerate Test' : 'Generate Test'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}
-                          aria-label="Delete item"
-                        >
-                          <Trash2 className="h-3 w-3 text-red-500" />
-                        </Button>
-                      </div>
-
-                      {hasTest && (
-                        <details className="group">
-                          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3 text-green-600" /> Generated test code
-                          </summary>
-                          <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg text-code-fg p-3 text-xs max-h-64 overflow-y-auto">
-                            {item.generatedTestCode}
-                          </pre>
-                        </details>
-                      )}
-                    </>
-                  )}
-                </CardContent>
-              )}
-            </Card>
-          );
-        })}
-      </div>
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('deleteDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('deleteConfirm')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+              {t('cancel')}
+            </Button>
+            <Button variant="destructive" onClick={onDeleteChecklist} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {t('delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+// --- Item Card ---
+
+function ItemCard({ item, checklist, token, isExpanded, isEditing, isGenerating, onToggleExpand, onEdit, onCancelEdit, onUpdateItem, onDeleteItem, onGenerateTest, onNoteUpdate, t }: {
+  item: ChecklistItem;
+  checklist: Checklist;
+  token: string;
+  isExpanded: boolean;
+  isEditing: boolean;
+  isGenerating: boolean;
+  onToggleExpand: () => void;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onUpdateItem: (itemId: string, data: Partial<ChecklistItem>) => void;
+  onDeleteItem: (itemId: string) => void;
+  onGenerateTest: () => void;
+  onNoteUpdate: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const hasTest = !!item.generatedTestCode;
+
+  async function toggleCompleted(e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await updateChecklistItem(checklist.id, item.id, { isCompleted: !item.isCompleted } as any, token);
+      onNoteUpdate(); // refetch
+    } catch {
+      // best-effort
+    }
+  }
+
+  return (
+    <Card className={`hover:shadow-md transition-shadow ${item.isCompleted ? 'opacity-70' : ''}`}>
+      <CardHeader
+        className="py-3 cursor-pointer"
+        role="button"
+        tabIndex={0}
+        onClick={onToggleExpand}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpand(); } }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleCompleted}
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors cursor-pointer ${
+                item.isCompleted
+                  ? 'bg-primary border-primary text-primary-foreground'
+                  : 'border-muted-foreground/40 hover:border-primary'
+              }`}
+              aria-label={item.isCompleted ? t('markIncomplete') : t('markComplete')}
+            >
+              {item.isCompleted && <CheckCircle2 className="h-3.5 w-3.5" />}
+            </button>
+            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <div>
+              <CardTitle className={`text-sm font-medium ${item.isCompleted ? 'line-through text-muted-foreground' : ''}`}>{item.title}</CardTitle>
+              {item.expectedBehavior && <p className="text-xs text-muted-foreground">{item.expectedBehavior}</p>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={priorityColors[item.priority]}>{item.priority}</Badge>
+            {hasTest && <Code2 className="h-4 w-4 text-green-600" />}
+            {item.note && <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />}
+          </div>
+        </div>
+      </CardHeader>
+
+      {isExpanded && (
+        <CardContent className="pt-0 space-y-3">
+          {isEditing ? (
+            <EditItemForm item={item} onSave={(data) => onUpdateItem(item.id, data)} onCancel={onCancelEdit} />
+          ) : (
+            <>
+              {item.description && <p className="text-sm">{item.description}</p>}
+
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onEdit(); }}>{t('edit')}</Button>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={(e) => { e.stopPropagation(); onGenerateTest(); }}
+                  disabled={isGenerating}
+                >
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  {isGenerating ? t('generating') : hasTest ? t('regenerateTest') : t('generateTest')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}>
+                  <Trash2 className="h-3 w-3 text-red-500" />
+                </Button>
+              </div>
+
+              {hasTest && (
+                <details className="group">
+                  <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-green-600" /> {t('generatedTestCode')}
+                  </summary>
+                  <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg text-code-fg p-3 text-xs max-h-64 overflow-y-auto">
+                    {item.generatedTestCode}
+                  </pre>
+                </details>
+              )}
+
+              {/* Note */}
+              <NoteField item={item} checklist={checklist} token={token} onUpdate={onNoteUpdate} t={t} />
+
+              {/* AI Chat */}
+              <ItemChat item={item} checklist={checklist} token={token} t={t} />
+            </>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// --- Note Field ---
+
+function NoteField({ item, checklist, token, onUpdate, t }: {
+  item: ChecklistItem;
+  checklist: Checklist;
+  token: string;
+  onUpdate: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [note, setNote] = useState(item.note || '');
+  const [saving, setSaving] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => { setNote(item.note || ''); }, [item.note]);
+
+  function handleChange(value: string) {
+    setNote(value);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => saveNote(value), 1000);
+  }
+
+  async function saveNote(value: string) {
+    if (value === (item.note || '')) return;
+    setSaving(true);
+    try {
+      await updateChecklistItem(checklist.id, item.id, { note: value } as any, token);
+      onUpdate();
+    } catch {
+      // best-effort
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-2 mb-1">
+        <Label className="text-xs text-muted-foreground">{t('note')}</Label>
+        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+        {item.noteUpdatedAt && (
+          <span className="text-[10px] text-muted-foreground/60">
+            {new Date(item.noteUpdatedAt).toLocaleString()}
+          </span>
+        )}
+      </div>
+      <textarea
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        placeholder={t('notePlaceholder')}
+        value={note}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={() => saveNote(note)}
+      />
+    </div>
+  );
+}
+
+// --- Item AI Chat ---
+
+function ItemChat({ item, checklist, token, t }: {
+  item: ChecklistItem;
+  checklist: Checklist;
+  token: string;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [messages, setMessages] = useState<ItemMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  async function loadMessages() {
+    try {
+      const msgs = await getItemMessages(checklist.id, item.id, token);
+      setMessages(msgs);
+      setLoaded(true);
+    } catch {
+      // best-effort
+    }
+  }
+
+  function handleOpen() {
+    setIsOpen(!isOpen);
+    if (!isOpen && !loaded) {
+      loadMessages();
+    }
+  }
+
+  async function handleSend() {
+    if (!input.trim() || loading) return;
+    const text = input.trim();
+    setInput('');
+    // Optimistic user message
+    setMessages((prev) => [...prev, { id: `temp-${Date.now()}`, itemId: item.id, role: 'user', content: text, createdAt: new Date().toISOString() }]);
+    setLoading(true);
+    try {
+      const assistantMsg = await sendItemMessage(checklist.id, item.id, text, token);
+      // Replace optimistic + add assistant
+      const fresh = await getItemMessages(checklist.id, item.id, token);
+      setMessages(fresh);
+    } catch {
+      // best-effort
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={handleOpen}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+      >
+        <MessageSquare className="h-3.5 w-3.5" />
+        {t('aiChat')} {messages.length > 0 && `(${messages.length})`}
+        {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+      </button>
+
+      {isOpen && (
+        <div className="mt-2 rounded-lg border bg-muted/30 p-3">
+          {/* Messages */}
+          <div className="max-h-60 overflow-y-auto space-y-2 mb-3">
+            {messages.length === 0 && !loading && (
+              <p className="text-xs text-muted-foreground text-center py-2">{t('chatEmpty')}</p>
+            )}
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                  msg.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card border'
+                }`}>
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-card border rounded-lg px-3 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={t('chatPlaceholder')}
+              className="text-sm"
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              disabled={loading}
+            />
+            <Button size="sm" onClick={handleSend} disabled={loading || !input.trim()}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Edit Item Form ---
 
 function EditItemForm({ item, onSave, onCancel }: {
   item: ChecklistItem;
@@ -310,13 +666,15 @@ function EditItemForm({ item, onSave, onCancel }: {
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description);
   const [expectedBehavior, setExpectedBehavior] = useState(item.expectedBehavior);
-  const [priority, setPriority] = useState(item.priority);
+  const [priority, setPriority] = useState<string>(item.priority);
+  const [section, setSection] = useState(item.section || '');
 
   return (
     <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
       <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
       <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" />
       <Input value={expectedBehavior} onChange={(e) => setExpectedBehavior(e.target.value)} placeholder="Expected behavior" />
+      <Input value={section} onChange={(e) => setSection(e.target.value)} placeholder="Section (e.g., Authentication)" />
       <select className="w-full rounded-md border px-3 py-2 text-sm" value={priority} onChange={(e) => setPriority(e.target.value)}>
         <option value="LOW">Low</option>
         <option value="MEDIUM">Medium</option>
@@ -324,7 +682,7 @@ function EditItemForm({ item, onSave, onCancel }: {
         <option value="CRITICAL">Critical</option>
       </select>
       <div className="flex gap-2">
-        <Button size="sm" onClick={() => onSave({ title, description, expectedBehavior, priority } as any)}>Save</Button>
+        <Button size="sm" onClick={() => onSave({ title, description, expectedBehavior, priority, section } as any)}>Save</Button>
         <Button size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
       </div>
     </div>

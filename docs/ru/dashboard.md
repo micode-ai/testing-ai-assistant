@@ -281,6 +281,14 @@ sequenceDiagram
 - Потоковая передача ответов через SSE
 - Многоходовые беседы с историей
 
+### Чек-листы (/projects/[projectId]/checklists)
+
+- Кнопка «Сгенерировать с ИИ» — генерация чек-листа через ChecklistGeneratorAgent
+- Сворачиваемые секции (section) для группировки пунктов
+- Чекбоксы (isCompleted) для отметки выполненных пунктов
+- Заметки (note, noteUpdatedAt) к каждому пункту
+- AI-чат (CHECKLIST_ITEM_CHAT) для обсуждения отдельного пункта чек-листа
+
 ### AI-генерация (/projects/[projectId]/ai/generate)
 
 - Выбор типа генерации (TEST_GEN, BUG_DETECT, FLAKY_DETECT, COVERAGE_ADVICE)

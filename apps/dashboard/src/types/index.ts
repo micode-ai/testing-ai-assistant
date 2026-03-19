@@ -115,7 +115,7 @@ export interface CoverageSnapshot {
   createdAt: string;
 }
 
-export type GenerationType = 'TEST_GEN' | 'BUG_DETECT' | 'FLAKY_DETECT' | 'COVERAGE_ADVICE' | 'PROJECT_ANALYSIS' | 'TEST_PROPOSAL';
+export type GenerationType = 'TEST_GEN' | 'BUG_DETECT' | 'FLAKY_DETECT' | 'COVERAGE_ADVICE' | 'CHECKLIST_GEN' | 'CHECKLIST_TEST_GEN' | 'CHECKLIST_ITEM_CHAT' | 'PROJECT_ANALYSIS' | 'TEST_PROPOSAL';
 
 export type TestGenSessionStatus =
   | 'ANALYZING'

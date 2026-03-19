@@ -19,6 +19,7 @@ enum GenerationType {
   CHECKLIST_TEST_GEN
   PROJECT_ANALYSIS
   TEST_PROPOSAL
+  CHECKLIST_ITEM_CHAT
 }
 
 enum TestGenSessionStatus {

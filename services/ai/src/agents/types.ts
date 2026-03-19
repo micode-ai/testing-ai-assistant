@@ -183,6 +183,18 @@ export interface ChecklistTestGenState {
   tokensUsed: number;
 }
 
+export interface ChecklistItemChatInput extends AgentInput {
+  context: {
+    item: {
+      title: string;
+      description: string;
+      expectedBehavior: string;
+    };
+    note: string;
+    messages: { role: string; content: string }[];
+  };
+}
+
 export interface CoverageRecommendation {
   filePath: string;
   priority: 'high' | 'medium' | 'low';

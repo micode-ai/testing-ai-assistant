@@ -40,7 +40,7 @@ export class ChecklistRepository {
   }
 
   async findItemById(id: string) {
-    return this.prisma.checklistItem.findUnique({ where: { id } });
+    return this.prisma.checklistItem.findUnique({ where: { id }, include: { checklist: true } });
   }
 
   async updateItem(id: string, data: Prisma.ChecklistItemUpdateInput) {
@@ -60,6 +60,19 @@ export class ChecklistRepository {
 
   async getItemCount(checklistId: string): Promise<number> {
     return this.prisma.checklistItem.count({ where: { checklistId } });
+  }
+
+  // --- Item Messages ---
+
+  async getItemMessages(itemId: string) {
+    return this.prisma.checklistItemMessage.findMany({
+      where: { itemId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async createItemMessage(data: Prisma.ChecklistItemMessageUncheckedCreateInput) {
+    return this.prisma.checklistItemMessage.create({ data });
   }
 
   // --- Runs ---

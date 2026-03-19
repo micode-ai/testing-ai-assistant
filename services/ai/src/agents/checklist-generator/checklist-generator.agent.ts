@@ -105,12 +105,14 @@ export class ChecklistGeneratorAgent extends BaseAgent {
       new SystemMessage(
         'You are a senior QA engineer. Based on the analysis, generate a comprehensive test checklist.\n\n' +
         'Output a JSON array of checklist items. Each item must have:\n' +
+        '- "section": logical grouping name (e.g. "Authentication", "Navigation", "Forms & Inputs", "Data Display", "Error Handling", "Responsive & Accessibility")\n' +
         '- "title": short, specific test case name\n' +
         '- "description": what to test and how\n' +
         '- "expectedBehavior": the expected outcome\n' +
         '- "priority": one of "CRITICAL", "HIGH", "MEDIUM", "LOW"\n\n' +
+        'Group related items under the same section. Use 3-7 sections.\n' +
         'Cover happy paths, error handling, edge cases, and UI validation.\n' +
-        'Generate 10-25 items. Output ONLY the JSON array, no markdown or explanations.',
+        'Generate 15-30 items. Output ONLY the JSON array, no markdown or explanations.',
       ),
       new HumanMessage(`Application Analysis:\n${state.analysis}`),
     ]);
@@ -128,7 +130,7 @@ export class ChecklistGeneratorAgent extends BaseAgent {
       new SystemMessage(
         'You are a QA reviewer. Validate the following test checklist JSON:\n' +
         '1. Is it valid JSON array?\n' +
-        '2. Does each item have title, description, expectedBehavior, priority?\n' +
+        '2. Does each item have section, title, description, expectedBehavior, priority?\n' +
         '3. Are priorities valid (CRITICAL/HIGH/MEDIUM/LOW)?\n' +
         '4. Are test cases specific and testable?\n' +
         '5. Any duplicates?\n\n' +

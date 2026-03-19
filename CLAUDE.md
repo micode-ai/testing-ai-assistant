@@ -99,6 +99,7 @@ cd services/test-runner && npx tsc --noEmit
 
 - **Dashboard → Services**: Direct REST calls with JWT Bearer token from NextAuth session
 - **Dashboard → Identity**: `POST /api/v1/users/batch` (no auth, `@Public()`) to resolve user IDs to names/emails (used by members page)
+- **Pipeline → AI**: `POST /ai/generate` with type `CHECKLIST_ITEM_CHAT` for per-item AI chat in checklists (no auth, internal)
 - **Pipeline → Project**: HTTP via `ProjectClient` to internal endpoint `/api/v1/projects/:id` (no auth)
 - **Pipeline → Temporal**: Starts workflows (`testPipelineWorkflow`, `checklistRunWorkflow`)
 - **Test Runner → Pipeline**: HTTP reporting to `/api/v1/runs/:id/status` and `/api/v1/checklist-runs/:id` (no auth, `@Public()` endpoints)

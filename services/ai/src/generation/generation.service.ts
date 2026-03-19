@@ -21,6 +21,7 @@ import { ChecklistGeneratorService } from '../agents/checklist-generator/checkli
 import { ChecklistTestGeneratorService } from '../agents/checklist-test-generator/checklist-test-generator.service';
 import { ProjectAnalyzerService } from '../agents/project-analyzer/project-analyzer.service';
 import { TestProposerService } from '../agents/test-proposer/test-proposer.service';
+import { ChecklistItemChatService } from '../agents/checklist-item-chat/checklist-item-chat.service';
 import { AgentOutput } from '../agents/types';
 
 @Injectable()
@@ -38,6 +39,7 @@ export class GenerationService {
     private readonly checklistTestGeneratorService: ChecklistTestGeneratorService,
     private readonly projectAnalyzerService: ProjectAnalyzerService,
     private readonly testProposerService: TestProposerService,
+    private readonly checklistItemChatService: ChecklistItemChatService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -170,6 +172,8 @@ export class GenerationService {
         return this.projectAnalyzerService.analyze(input as any);
       case GenerationType.TEST_PROPOSAL:
         return this.testProposerService.propose(input as any);
+      case GenerationType.CHECKLIST_ITEM_CHAT:
+        return this.checklistItemChatService.chat(input as any);
       default:
         throw new BadRequestException(`Unsupported generation type: ${type}`);
     }

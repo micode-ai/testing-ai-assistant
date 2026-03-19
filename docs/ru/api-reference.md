@@ -73,6 +73,8 @@ Access token получается через эндпоинты `/auth/login` и
 | `GET` | `/test-runs?pipelineId=` | Bearer JWT | Список запусков по пайплайну |
 | `GET` | `/test-runs/:id` | Bearer JWT | Получить запуск с результатами |
 | `POST` | `/test-runs/:id/cancel` | Bearer JWT | Отменить запуск |
+| `GET` | `/checklists/:id/items/:itemId/messages` | Bearer JWT | Сообщения AI-чата для пункта чек-листа |
+| `POST` | `/checklists/:id/items/:itemId/messages` | Bearer JWT | Отправить сообщение в AI-чат пункта чек-листа |
 
 ### AI Service (порт 3005)
 
