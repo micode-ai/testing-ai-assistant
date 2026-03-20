@@ -97,6 +97,16 @@ All endpoints require `Bearer JWT` authentication.
 | `POST` | `/ai/knowledge/index` | Bearer JWT | Re-index documentation |
 | `GET` | `/ai/knowledge/search?q=&projectId=` | Bearer JWT | Search knowledge base |
 
+### Pipeline Internal Endpoints (consumed by AI Service)
+
+The AI service calls Pipeline service endpoints to auto-fetch project context:
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/runs/by-project/:projectId/latest` | Internal (no auth) | Latest completed run with results |
+| `GET` | `/api/v1/runs/by-project/:projectId/history` | Internal (no auth) | Last 10 completed runs with results |
+| `GET` | `/api/v1/runs/by-project/:projectId/coverage` | Internal (no auth) | Latest coverage snapshot |
+
 ## Generation Types
 
 | Type | Description | Typical Model |
@@ -143,6 +153,25 @@ flowchart TD
 
 ### Bug Detector Agent
 
+**Auto-fetch context:** `BugDetectContextService` automatically fetches project context before generation:
+- Source code from git repository (recent diff up to 15K chars, up to 10 files at 3K chars each, 30K total limit)
+- Latest test run results from Pipeline service (via `GET /api/v1/runs/by-project/:projectId/latest`)
+
+**Localization:** Report is generated in the user's locale (en/ru/pl).
+
+**Output JSON format:**
+```json
+{
+  "bugs": [{ "severity": "HIGH", "location": "src/...", "title": "...", "description": "...", "impact": "...", "fixSuggestion": "..." }],
+  "summary": "...",
+  "totalBugs": 5,
+  "criticalCount": 1,
+  "highCount": 2,
+  "mediumCount": 1,
+  "lowCount": 1
+}
+```
+
 ```mermaid
 flowchart TD
     Start([Start]) --> AnalyzeResults
@@ -159,13 +188,29 @@ flowchart TD
     style End fill:#22c55e,color:#fff
 ```
 
-**Input context**: Test run results (failed tests), git diff between commits, file contents around failures.
+**Input context**: Auto-fetched test run results (failed tests), git diff between commits, file contents around failures. Manual override available via `inputContext`.
 
 **Output**: Bug report with severity ratings, affected files/lines, root cause analysis, and suggested fixes.
 
 **Model routing**: Uses the advanced model (o3) for deep reasoning about failure causes.
 
 ### Flaky Test Detector Agent
+
+**Auto-fetch context:** `BugDetectContextService.fetchTestHistory()` fetches the last 10 completed test runs from Pipeline service (via `GET /api/v1/runs/by-project/:projectId/history`).
+
+**Localization:** Report is generated in the user's locale (en/ru/pl).
+
+**Output JSON format:**
+```json
+{
+  "flakyTests": [{ "testName": "...", "flakinessScore": 0.75, "failRate": 0.3, "pattern": "TIMING", "patternLabel": "...", "description": "...", "impact": "...", "recommendation": "..." }],
+  "summary": "...",
+  "totalAnalyzed": 50,
+  "flakyCount": 5,
+  "stableCount": 45,
+  "overallHealthScore": 90
+}
+```
 
 ```mermaid
 flowchart TD
@@ -181,13 +226,27 @@ flowchart TD
     style End fill:#22c55e,color:#fff
 ```
 
-**Input context**: Historical test run results (last N runs), test names, durations, pass/fail history.
+**Input context**: Auto-fetched historical test run results (last 10 runs), test names, durations, pass/fail history.
 
 **Output**: Ranked list of flaky tests with flakiness scores, pattern classifications, and stabilization recommendations.
 
 **Model routing**: Uses the fast model (gpt-4.1-mini) since pattern matching and statistical analysis are less reasoning-intensive.
 
 ### Coverage Advisor Agent
+
+**Auto-fetch context:** `BugDetectContextService.fetchCoverageContext()` fetches coverage data from Pipeline service (via `GET /api/v1/runs/by-project/:projectId/coverage`). When no coverage data exists, falls back to analyzing source files from the git repository to find files without corresponding tests.
+
+**Localization:** Report is generated in the user's locale (en/ru/pl).
+
+**Output JSON format:**
+```json
+{
+  "recommendations": [{ "filePath": "src/...", "priority": "HIGH", "testType": "UNIT", "title": "...", "description": "...", "sampleTestStub": "..." }],
+  "summary": "...",
+  "overallPercentage": 65,
+  "prioritizedFiles": ["src/..."]
+}
+```
 
 ```mermaid
 flowchart TD
@@ -201,7 +260,7 @@ flowchart TD
     style End fill:#22c55e,color:#fff
 ```
 
-**Input context**: Coverage snapshot data (line/branch/function percentages, uncovered file map), source code for uncovered areas.
+**Input context**: Auto-fetched coverage snapshot data (line/branch/function percentages, uncovered file map), source code for uncovered areas. Falls back to git source file analysis when no coverage data is available.
 
 **Output**: Prioritized list of coverage improvement recommendations with specific test case suggestions.
 

@@ -26,10 +26,16 @@ Automatic creation of tests for existing code.
 AI-powered code analysis for potential bugs.
 
 **How it works:**
-1. The agent scans the project code
-2. Searches for patterns that commonly lead to bugs
-3. Analyzes edge conditions and error handling
-4. Provides descriptions of found issues and fix recommendations
+1. The system automatically fetches project context: source code from the git repository (recent diff, file contents) and latest test results from the Pipeline service
+2. The agent analyzes the fetched code and test results
+3. Searches for patterns that commonly lead to bugs, analyzes edge conditions and error handling
+4. Provides a structured report with found issues
+
+No manual input is required — just click "Generate". If needed, you can manually provide context via the collapsible "Advanced" section.
+
+**Results are displayed as rich cards** color-coded by severity (Critical, High, Medium, Low). Each card includes: title, description, code location, impact assessment, and fix suggestion.
+
+**Reports are automatically localized** to the user's language (English, Russian, Polish).
 
 **What it detects:**
 - Unhandled exceptions
@@ -43,10 +49,16 @@ AI-powered code analysis for potential bugs.
 Identification of unstable tests that sometimes pass and sometimes fail.
 
 **How it works:**
-1. The agent analyzes run history
-2. Finds tests with unstable results
-3. Determines the probable cause of instability
-4. Suggests fixes
+1. The system automatically fetches the last 10 test run history from the Pipeline service
+2. The agent performs statistical analysis and finds tests with unstable results
+3. Identifies the flakiness pattern and probable cause
+4. Suggests specific fixes
+
+No manual input is required — just click "Generate".
+
+**Results are displayed as rich cards** with metrics: overall Health Score, Flakiness Score per test, fail rate, pattern label (e.g., "Timing", "Shared State"), description, impact assessment, and recommendations.
+
+**Reports are automatically localized** to the user's language.
 
 **Common causes of flaky tests:**
 - Time dependency
@@ -59,10 +71,16 @@ Identification of unstable tests that sometimes pass and sometimes fail.
 Recommendations for improving code test coverage.
 
 **How it works:**
-1. The agent analyzes current coverage
-2. Identifies critical uncovered areas
-3. Prioritizes by importance
-4. Suggests specific tests to write
+1. The system automatically fetches coverage data (Coverage Snapshot) from the Pipeline service
+2. When no coverage data exists, it falls back to analyzing source files from the git repository and finds files without corresponding tests
+3. The agent identifies critical uncovered areas and prioritizes by importance
+4. Suggests specific tests to write with sample code stubs
+
+No manual input is required — just click "Generate".
+
+**Results are displayed as rich cards** color-coded by priority. Each card includes: file path, test type badge (Unit, Integration, E2E), description, and a sample test stub.
+
+**Reports are automatically localized** to the user's language.
 
 ### 5. Checklist Generation
 
@@ -249,9 +267,10 @@ This scans `docs/en/` and `user_docs/en/`, splits documents into chunks, generat
 
 1. Open project → "AI"
 2. Click "New Generation"
-3. Select generation type
-4. Wait for the result
-5. Review and decide: "Accept" or "Reject"
+3. Select generation type (for BUG_DETECT, FLAKY_DETECT, COVERAGE_ADVICE the context is fetched automatically)
+4. Click "Generate" and wait for the result
+5. Review the results displayed as visual cards
+6. Decide: "Accept" or "Reject"
 
 ### Via API
 

@@ -21,6 +21,7 @@ import { getGeneration, submitFeedback } from '@/lib/api/ai';
 import { PageSkeleton } from '@/components/shared/page-skeleton';
 import { BugReportView } from '@/components/shared/bug-report-view';
 import { FlakyReportView } from '@/components/shared/flaky-report-view';
+import { CoverageReportView } from '@/components/shared/coverage-report-view';
 import type { AIGeneration } from '@/types';
 
 export default function GenerationDetailPage() {
@@ -176,6 +177,8 @@ export default function GenerationDetailPage() {
             <BugReportView output={generation.output} />
           ) : generation.type === 'FLAKY_DETECT' ? (
             <FlakyReportView output={generation.output} />
+          ) : generation.type === 'COVERAGE_ADVICE' ? (
+            <CoverageReportView output={generation.output} />
           ) : (
             <div className="rounded-md bg-muted p-4 overflow-x-auto">
               <pre className="text-sm">

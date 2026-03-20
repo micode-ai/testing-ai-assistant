@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GitAdapterFactory, RepoProvider } from '../git-adapter';
 import type { GitAdapter } from '../git-adapter';
-import type { TestResultEntry, TestRunHistory } from '../agents/types';
+import type { TestResultEntry, TestRunHistory, CoverageData, UncoveredFile } from '../agents/types';
 
 interface ProjectInfo {
   id: string;
@@ -215,6 +215,201 @@ export class BugDetectContextService {
       this.logger.warn(`Failed to fetch test history: ${(error as Error).message}`);
       return { testHistory: [], testResults: [] };
     }
+  }
+
+  async fetchCoverageContext(projectId: string): Promise<{
+    coverageData: CoverageData;
+    uncoveredFiles: UncoveredFile[];
+    codeContent: Record<string, string>;
+  }> {
+    const emptyCoverage: CoverageData = { totalLines: 0, coveredLines: 0, percentage: 0, byFile: {} };
+
+    // Fetch coverage snapshot from pipeline
+    interface CovSnapshot { linePct: number; branchPct: number; functionPct: number; uncovered: Record<string, unknown> }
+    let covData: CovSnapshot | null = null;
+    try {
+      const response = await fetch(
+        `${this.pipelineServiceUrl}/api/v1/runs/by-project/${projectId}/coverage`,
+      );
+      if (response.ok) {
+        covData = (await response.json()) as CovSnapshot;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to fetch coverage: ${(error as Error).message}`);
+    }
+
+    const project = await this.fetchProjectInfo(projectId);
+    const adapter = await this.createAdapter(project);
+
+    // No coverage data from pipeline — fallback: analyze source files from git
+    if (!covData) {
+      this.logger.log('No coverage data found, falling back to source file analysis');
+      return this.buildCoverageFromSourceFiles(adapter, project);
+    }
+
+    // Build coverage data from snapshot
+    const snapshot = covData;
+    const uncoveredRaw = snapshot.uncovered && typeof snapshot.uncovered === 'object' && !Array.isArray(snapshot.uncovered)
+      ? snapshot.uncovered
+      : {};
+    const byFile: Record<string, { lines: number; covered: number; percentage: number }> = {};
+    let uncoveredFiles: UncoveredFile[] = [];
+
+    for (const [filePath, fileInfo] of Object.entries(uncoveredRaw)) {
+      const info = fileInfo as Record<string, unknown>;
+      const totalLines = Number(info.total || info.lines || 0);
+      const coveredLines = Number(info.covered || 0);
+      const uncoveredLines = Array.isArray(info.uncoveredLines) ? info.uncoveredLines as number[] : [];
+      const pct = totalLines > 0 ? Math.round((coveredLines / totalLines) * 100) : 0;
+
+      byFile[filePath] = { lines: totalLines, covered: coveredLines, percentage: pct };
+
+      if (uncoveredLines.length > 0 || pct < 80) {
+        uncoveredFiles.push({ filePath, uncoveredLines, totalLines });
+      }
+    }
+
+    // If we have coverage percentage but no file-level data, fallback to source file analysis
+    if (Object.keys(byFile).length === 0) {
+      this.logger.log(`Coverage snapshot has ${snapshot.linePct}% but no file-level data, analyzing source files`);
+      const fallback = await this.buildCoverageFromSourceFiles(adapter, project);
+      // Preserve the real percentage from pipeline
+      fallback.coverageData.percentage = snapshot.linePct;
+      return fallback;
+    }
+
+    const coverageData: CoverageData = {
+      totalLines: 0,
+      coveredLines: 0,
+      percentage: snapshot.linePct,
+      byFile,
+    };
+
+    // Fetch source code for top uncovered files
+    let codeContent: Record<string, string> = {};
+    if (uncoveredFiles.length > 0) {
+      const filesToFetch = uncoveredFiles
+        .slice(0, 5)
+        .map((f) => f.filePath)
+        .filter((f) => !BINARY_EXTENSIONS.has(f.substring(f.lastIndexOf('.')).toLowerCase()));
+
+      if (filesToFetch.length > 0) {
+        try {
+          const files = await adapter.getMultipleFiles(
+            project.repoOwner,
+            project.repoName,
+            project.defaultBranch,
+            filesToFetch,
+          );
+          for (const file of files) {
+            codeContent[file.path] = file.content.slice(0, MAX_FILE_CHARS);
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to fetch source for coverage: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    return { coverageData, uncoveredFiles, codeContent };
+  }
+
+  /**
+   * When no coverage data exists, fetch source files and mark all as "uncovered"
+   * so the AI can recommend what needs test coverage.
+   */
+  private async buildCoverageFromSourceFiles(
+    adapter: GitAdapter,
+    project: ProjectInfo,
+  ): Promise<{ coverageData: CoverageData; uncoveredFiles: UncoveredFile[]; codeContent: Record<string, string> }> {
+    const SOURCE_PATTERNS = /\.(ts|tsx|js|jsx|py|java|go|rs)$/;
+    const IGNORE_PATTERNS = [
+      /node_modules\//,
+      /\.test\./,
+      /\.spec\./,
+      /test_/,
+      /_test\./,
+      /__tests__\//,
+      /\.d\.ts$/,
+      /dist\//,
+      /build\//,
+      /\.next\//,
+      /coverage\//,
+      /\.config\./,
+    ];
+
+    const fileTree = await adapter.getFileTree(
+      project.repoOwner,
+      project.repoName,
+      project.defaultBranch,
+    );
+
+    const sourceFiles = fileTree
+      .filter((e) => e.type === 'file')
+      .map((e) => e.path)
+      .filter((f) => SOURCE_PATTERNS.test(f))
+      .filter((f) => !IGNORE_PATTERNS.some((p) => p.test(f)))
+      .slice(0, 15);
+
+    const testFiles = fileTree
+      .filter((e) => e.type === 'file')
+      .map((e) => e.path)
+      .filter((f) => /\.(test|spec)\.\w+$/.test(f) || /__tests__\//.test(f));
+
+    // Files that likely have no corresponding test
+    const testedBasenames = new Set(
+      testFiles.map((f) =>
+        f.replace(/\.(test|spec)/, '').replace(/__tests__\//, '').split('/').pop() || '',
+      ),
+    );
+    const uncoveredSourceFiles = sourceFiles.filter((f) => {
+      const basename = f.split('/').pop() || '';
+      return !testedBasenames.has(basename);
+    });
+
+    const filesToFetch = uncoveredSourceFiles.slice(0, MAX_FILES);
+    let codeContent: Record<string, string> = {};
+
+    if (filesToFetch.length > 0) {
+      try {
+        const files = await adapter.getMultipleFiles(
+          project.repoOwner,
+          project.repoName,
+          project.defaultBranch,
+          filesToFetch,
+        );
+        let totalChars = 0;
+        for (const file of files) {
+          const content = file.content.slice(0, MAX_FILE_CHARS);
+          if (totalChars + content.length > MAX_CONTEXT_CHARS) break;
+          codeContent[file.path] = content;
+          totalChars += content.length;
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to fetch source files: ${(error as Error).message}`);
+      }
+    }
+
+    const byFile: Record<string, { lines: number; covered: number; percentage: number }> = {};
+    const uncoveredFiles: UncoveredFile[] = [];
+
+    for (const filePath of Object.keys(codeContent)) {
+      const lineCount = codeContent[filePath].split('\n').length;
+      byFile[filePath] = { lines: lineCount, covered: 0, percentage: 0 };
+      uncoveredFiles.push({ filePath, uncoveredLines: [], totalLines: lineCount });
+    }
+
+    const coverageData: CoverageData = {
+      totalLines: Object.values(byFile).reduce((s, f) => s + f.lines, 0),
+      coveredLines: 0,
+      percentage: 0,
+      byFile,
+    };
+
+    this.logger.log(
+      `Built coverage context from ${sourceFiles.length} source files, ${testFiles.length} test files, ${uncoveredFiles.length} likely untested`,
+    );
+
+    return { coverageData, uncoveredFiles, codeContent };
   }
 
   private mapStatus(status: string): 'passed' | 'failed' | 'skipped' {

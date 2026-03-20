@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { GenerationTypeBadge } from '@/components/shared/generation-type-badge';
 import { BugReportView } from '@/components/shared/bug-report-view';
 import { FlakyReportView } from '@/components/shared/flaky-report-view';
+import { CoverageReportView } from '@/components/shared/coverage-report-view';
 import { triggerGeneration, submitFeedback } from '@/lib/api/ai';
 import type { AIGeneration, GenerationType } from '@/types';
 
@@ -292,6 +293,8 @@ export default function GeneratePage() {
               <BugReportView output={result.output} />
             ) : result.type === 'FLAKY_DETECT' ? (
               <FlakyReportView output={result.output} />
+            ) : result.type === 'COVERAGE_ADVICE' ? (
+              <CoverageReportView output={result.output} />
             ) : (
               <div className="rounded-md bg-muted p-4 overflow-x-auto">
                 <pre className="text-sm">

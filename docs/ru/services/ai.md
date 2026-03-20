@@ -85,6 +85,16 @@ KnowledgeChunk
 | `POST` | `/ai/knowledge/index` | Bearer JWT | Переиндексация документации |
 | `GET` | `/ai/knowledge/search?q=&projectId=` | Bearer JWT | Поиск по базе знаний |
 
+### Внутренние эндпоинты Pipeline-сервиса (используются AI-сервисом)
+
+AI-сервис обращается к Pipeline-сервису для автоматического получения контекста проекта:
+
+| Метод | Путь | Авторизация | Описание |
+|-------|------|-------------|----------|
+| `GET` | `/api/v1/runs/by-project/:projectId/latest` | Внутренний (без auth) | Последний завершённый прогон с результатами |
+| `GET` | `/api/v1/runs/by-project/:projectId/history` | Внутренний (без auth) | Последние 10 завершённых прогонов с результатами |
+| `GET` | `/api/v1/runs/by-project/:projectId/coverage` | Внутренний (без auth) | Последний снимок покрытия (CoverageSnapshot) |
+
 ## Архитектура LangGraph-агентов
 
 Каждый тип генерации реализован как граф состояний (LangGraph), определяющий последовательность шагов обработки.
@@ -127,6 +137,25 @@ flowchart TD
 
 ### 2. Детектор багов (BUG_DETECT)
 
+**Автоматический сбор контекста:** `BugDetectContextService` автоматически загружает контекст проекта перед генерацией:
+- Исходный код из git-репозитория (последний diff до 15K символов, до 10 файлов по 3K символов, общий лимит 30K символов)
+- Результаты последнего тестового прогона из Pipeline-сервиса (через `GET /api/v1/runs/by-project/:projectId/latest`)
+
+**Локализация:** Отчёт генерируется на языке пользователя (ru/en/pl).
+
+**Формат выхода:**
+```json
+{
+  "bugs": [{ "severity": "HIGH", "location": "src/...", "title": "...", "description": "...", "impact": "...", "fixSuggestion": "..." }],
+  "summary": "...",
+  "totalBugs": 5,
+  "criticalCount": 1,
+  "highCount": 2,
+  "mediumCount": 1,
+  "lowCount": 1
+}
+```
+
 ```mermaid
 flowchart TD
     START([Вход: результаты тестов,<br/>diff кода, контекст]) --> A
@@ -158,6 +187,22 @@ flowchart TD
 
 ### 3. Детектор flaky-тестов (FLAKY_DETECT)
 
+**Автоматический сбор контекста:** `BugDetectContextService.fetchTestHistory()` загружает историю последних 10 тестовых прогонов из Pipeline-сервиса (через `GET /api/v1/runs/by-project/:projectId/history`).
+
+**Локализация:** Отчёт генерируется на языке пользователя (ru/en/pl).
+
+**Формат выхода:**
+```json
+{
+  "flakyTests": [{ "testName": "...", "flakinessScore": 0.75, "failRate": 0.3, "pattern": "TIMING", "patternLabel": "...", "description": "...", "impact": "...", "recommendation": "..." }],
+  "summary": "...",
+  "totalAnalyzed": 50,
+  "flakyCount": 5,
+  "stableCount": 45,
+  "overallHealthScore": 90
+}
+```
+
 ```mermaid
 flowchart TD
     START([Вход: история запусков,<br/>метаданные тестов]) --> A
@@ -184,6 +229,20 @@ flowchart TD
 | `generateRecommendations` | fast | Конкретные рекомендации по каждому flaky-тесту |
 
 ### 4. Советник по покрытию (COVERAGE_ADVICE)
+
+**Автоматический сбор контекста:** `BugDetectContextService.fetchCoverageContext()` загружает данные о покрытии из Pipeline-сервиса (через `GET /api/v1/runs/by-project/:projectId/coverage`). Если данные покрытия отсутствуют, используется fallback: анализ исходных файлов из git-репозитория для поиска файлов без соответствующих тестов.
+
+**Локализация:** Отчёт генерируется на языке пользователя (ru/en/pl).
+
+**Формат выхода:**
+```json
+{
+  "recommendations": [{ "filePath": "src/...", "priority": "HIGH", "testType": "UNIT", "title": "...", "description": "...", "sampleTestStub": "..." }],
+  "summary": "...",
+  "overallPercentage": 65,
+  "prioritizedFiles": ["src/..."]
+}
+```
 
 ```mermaid
 flowchart TD

@@ -26,10 +26,16 @@ Automatyczne tworzenie testów dla istniejącego kodu.
 Analiza kodu przez AI pod kątem potencjalnych błędów.
 
 **Jak to działa:**
-1. Agent skanuje kod projektu
-2. Szuka wzorców często prowadzących do błędów
-3. Analizuje warunki brzegowe i obsługę błędów
-4. Dostarcza opisy znalezionych problemów i rekomendacje naprawy
+1. System automatycznie pobiera kontekst projektu: kod źródłowy z repozytorium git (ostatni diff, zawartość plików) oraz najnowsze wyniki testów z serwisu Pipeline
+2. Agent analizuje pobrany kod i wyniki testów
+3. Szuka wzorców często prowadzących do błędów, analizuje warunki brzegowe i obsługę błędów
+4. Dostarcza ustrukturyzowany raport ze znalezionymi problemami
+
+Ręczne wprowadzanie danych nie jest wymagane — wystarczy kliknąć „Generuj". W razie potrzeby można ręcznie podać kontekst w rozwijanej sekcji „Zaawansowane".
+
+**Wyniki wyświetlane są jako karty** z kolorowym oznaczeniem według ważności (Critical, High, Medium, Low). Każda karta zawiera: tytuł, opis, lokalizację w kodzie, ocenę wpływu i sugestię naprawy.
+
+**Raport jest automatycznie lokalizowany** do języka użytkownika (polski, angielski, rosyjski).
 
 **Co wykrywa:**
 - Nieobsłużone wyjątki
@@ -43,10 +49,16 @@ Analiza kodu przez AI pod kątem potencjalnych błędów.
 Identyfikacja niestabilnych testów, które czasem przechodzą, a czasem nie.
 
 **Jak to działa:**
-1. Agent analizuje historię przebiegów
-2. Znajduje testy z niestabilnymi wynikami
-3. Określa prawdopodobną przyczynę niestabilności
-4. Proponuje sposoby naprawy
+1. System automatycznie pobiera historię ostatnich 10 przebiegów testowych z serwisu Pipeline
+2. Agent przeprowadza analizę statystyczną wyników i znajduje testy z niestabilnymi wynikami
+3. Identyfikuje wzorzec niestabilności i prawdopodobną przyczynę
+4. Proponuje konkretne sposoby naprawy
+
+Ręczne wprowadzanie danych nie jest wymagane — wystarczy kliknąć „Generuj".
+
+**Wyniki wyświetlane są jako karty** z metrykami: ogólny wskaźnik zdrowia (Health Score), ocena niestabilności (Flakiness Score), częstość awarii, etykieta wzorca (np. „Timing", „Shared State"), opis, ocena wpływu i rekomendacje.
+
+**Raport jest automatycznie lokalizowany** do języka użytkownika.
 
 **Typowe przyczyny niestabilnych testów:**
 - Zależność od czasu
@@ -59,10 +71,16 @@ Identyfikacja niestabilnych testów, które czasem przechodzą, a czasem nie.
 Rekomendacje dotyczące poprawy pokrycia kodu testami.
 
 **Jak to działa:**
-1. Agent analizuje bieżące pokrycie
-2. Identyfikuje krytyczne niepokryte obszary
-3. Priorytetyzuje według ważności
-4. Proponuje konkretne testy do napisania
+1. System automatycznie pobiera dane o pokryciu (Coverage Snapshot) z serwisu Pipeline
+2. Gdy dane o pokryciu nie istnieją, system analizuje pliki źródłowe z repozytorium git i znajduje pliki bez odpowiadających im testów
+3. Agent identyfikuje krytyczne niepokryte obszary i priorytetyzuje je według ważności
+4. Proponuje konkretne testy do napisania z przykładowym kodem
+
+Ręczne wprowadzanie danych nie jest wymagane — wystarczy kliknąć „Generuj".
+
+**Wyniki wyświetlane są jako karty** z kolorowym oznaczeniem według priorytetu. Każda karta zawiera: ścieżkę do pliku, typ testu (Unit, Integration, E2E), opis i przykładowy kod testu (stub).
+
+**Raport jest automatycznie lokalizowany** do języka użytkownika.
 
 ### 5. Generowanie checklisty
 
@@ -249,9 +267,10 @@ Endpoint skanuje `docs/en/` i `user_docs/en/`, dzieli dokumenty na fragmenty, ge
 
 1. Otwórz projekt → „AI"
 2. Kliknij „Nowe generowanie"
-3. Wybierz typ generowania
-4. Poczekaj na wynik
-5. Przejrzyj i zdecyduj: „Zaakceptuj" lub „Odrzuć"
+3. Wybierz typ generowania (dla BUG_DETECT, FLAKY_DETECT, COVERAGE_ADVICE kontekst jest pobierany automatycznie)
+4. Kliknij „Generuj" i poczekaj na wynik
+5. Przejrzyj wyniki wyświetlone jako wizualne karty
+6. Zdecyduj: „Zaakceptuj" lub „Odrzuć"
 
 ### Przez API
 

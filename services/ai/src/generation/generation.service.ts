@@ -207,8 +207,26 @@ export class GenerationService {
 
         return this.flakyDetectorService.analyze({ projectId, context: flakyContext } as any);
       }
-      case GenerationType.COVERAGE_ADVICE:
-        return this.coverageAdvisorService.advise(input as any);
+      case GenerationType.COVERAGE_ADVICE: {
+        const covCtx = inputContext as Record<string, unknown>;
+        const covLocale = (covCtx.locale as string) || undefined;
+        let covContext;
+
+        if (covCtx.coverageData && typeof covCtx.coverageData === 'object') {
+          covContext = {
+            coverageData: covCtx.coverageData,
+            uncoveredFiles: Array.isArray(covCtx.uncoveredFiles) ? covCtx.uncoveredFiles : [],
+            codeContent: (covCtx.codeContent as Record<string, string>) || {},
+            locale: covLocale,
+          };
+        } else {
+          this.logger.log(`Auto-fetching coverage context for project ${projectId}`);
+          const autoContext = await this.bugDetectContextService.fetchCoverageContext(projectId);
+          covContext = { ...autoContext, locale: covLocale };
+        }
+
+        return this.coverageAdvisorService.advise({ projectId, context: covContext } as any);
+      }
       case GenerationType.CHECKLIST_GEN:
         return this.checklistGeneratorService.generate(input as any);
       case GenerationType.CHECKLIST_TEST_GEN:

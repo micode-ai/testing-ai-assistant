@@ -34,6 +34,41 @@ export class RunReportController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Get('by-project/:projectId/coverage')
+  @ApiOperation({ summary: 'Get latest coverage data for a project (internal)' })
+  async getCoverageByProject(@Param('projectId') projectId: string) {
+    const pipelines = await this.pipelineRepository.findByProjectId(projectId);
+    if (pipelines.length === 0) return null;
+
+    const pipelineIds = pipelines.map((p) => p.id);
+
+    // Find latest run that has a COVERAGE result with a snapshot
+    const run = await this.prisma.testRun.findFirst({
+      where: {
+        pipelineId: { in: pipelineIds },
+        status: { in: ['PASSED', 'FAILED'] },
+        results: { some: { checkType: 'COVERAGE', coverage: { isNot: null } } },
+      },
+      orderBy: { finishedAt: 'desc' },
+      include: {
+        results: {
+          where: { checkType: 'COVERAGE' },
+          include: { coverage: true },
+        },
+      },
+    });
+
+    if (!run || !run.results[0]?.coverage) return null;
+
+    const cov = run.results[0].coverage;
+    return {
+      linePct: cov.linePct,
+      branchPct: cov.branchPct,
+      functionPct: cov.functionPct,
+      uncovered: cov.uncovered,
+    };
+  }
+
   @Get('by-project/:projectId/history')
   @ApiOperation({ summary: 'Get recent completed runs with results for a project (internal)' })
   async getHistoryByProject(@Param('projectId') projectId: string) {

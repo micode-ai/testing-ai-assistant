@@ -110,6 +110,7 @@ export interface CoverageAdviceInput extends AgentInput {
     coverageData: CoverageData;
     uncoveredFiles: UncoveredFile[];
     codeContent: Record<string, string>;
+    locale?: string;
   };
 }
 
