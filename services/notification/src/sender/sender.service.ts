@@ -51,6 +51,10 @@ export class SenderService {
     });
   }
 
+  async sendToConfig(config: NotificationConfig, payload: Record<string, unknown>): Promise<void> {
+    return this.dispatchToChannel(config, payload);
+  }
+
   private async dispatchToChannel(
     config: NotificationConfig,
     payload: Record<string, unknown>,

@@ -537,16 +537,15 @@
     "eventType": "Typ zdarzenia",
     "eventRunCompleted": "Uruchomienie zakończone",
     "eventRunFailed": "Uruchomienie nieudane",
-    "eventCoverageDrop": "Spadek pokrycia",
-    "eventPipelineCreated": "Potok utworzony",
-    "eventPipelineDeleted": "Potok usunięty",
+    "eventMembershipRequested": "Prośba o członkostwo",
     "emailAddresses": "Adresy email",
     "emailPlaceholder": "email1@example.com, email2@example.com",
     "emailHint": "Rozdziel adresy przecinkami.",
     "slackChannel": "Kanał Slack",
     "slackPlaceholder": "#nazwa-kanału",
     "telegramChatId": "Telegram Chat ID",
-    "telegramPlaceholder": "123456789"
+    "telegramPlaceholder": "123456789",
+    "testSend": "Wyślij testowe powiadomienie"
   },
   "auth": {
     "welcomeBack": "Witamy ponownie",

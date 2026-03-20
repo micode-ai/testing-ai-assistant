@@ -14,6 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ConfigService } from './config.service';
+import { SenderService } from '../sender/sender.service';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
 
@@ -22,7 +23,10 @@ import { UpdateConfigDto } from './dto/update-config.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('notifications/configs')
 export class ConfigController {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly senderService: SenderService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create notification config' })
@@ -55,5 +59,27 @@ export class ConfigController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id') id: string) {
     await this.configService.delete(id);
+  }
+
+  @Post(':id/test')
+  @ApiOperation({ summary: 'Send a test notification for this config only' })
+  async testConfig(@Param('id') id: string) {
+    const config = await this.configService.findById(id);
+    const payload = {
+      event: config.event,
+      data: {
+        runId: 'test-run-000',
+        runName: 'Test Notification',
+        passed: 10,
+        failed: 1,
+        skipped: 2,
+        total: 13,
+        duration: '45s',
+        commitSha: 'abc1234',
+        branch: 'main',
+      },
+    };
+    await this.senderService.sendToConfig(config as any, payload);
+    return { success: true, message: 'Test notification sent' };
   }
 }

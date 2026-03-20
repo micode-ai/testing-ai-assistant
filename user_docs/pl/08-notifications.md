@@ -17,7 +17,7 @@ Notification Service zapewnia wielokanałowe dostarczanie powiadomień o zdarzen
 
 ### Email (SMTP)
 
-Skonfiguruj w `.env`:
+Skonfiguruj w `.env` serwisu powiadomień:
 
 ```env
 SMTP_HOST=smtp.gmail.com
@@ -27,25 +27,34 @@ SMTP_PASS=your-app-password
 SMTP_FROM=noreply@yourdomain.com
 ```
 
+> **Wskazówka:** Dla Gmaila użyj [hasła aplikacji](https://support.google.com/accounts/answer/185833) zamiast zwykłego hasła.
+
 ### Slack
 
 1. Utwórz aplikację Slack na https://api.slack.com/apps
-2. Dodaj Bot Token Scopes: `chat:write`, `channels:read`
+2. Dodaj Bot Token Scopes: `chat:write`
 3. Zainstaluj aplikację w workspace
-4. Skopiuj Bot Token
+4. Skopiuj Bot Token (zaczyna się od `xoxb-`)
+5. Zaproś bota na wybrany kanał (`/invite @NazwaBota`)
 
 ```env
 SLACK_BOT_TOKEN=xoxb-your-token
 ```
 
+Podczas tworzenia konfiguracji dla Slacka podaj nazwę kanału (np. `#ci-results`).
+
 ### Telegram
 
 1. Utwórz bota przez @BotFather w Telegramie
 2. Uzyskaj token bota
+3. Dodaj bota do grupy/kanału
+4. Uzyskaj chat ID (możesz użyć `https://api.telegram.org/bot<TOKEN>/getUpdates` po wysłaniu wiadomości do bota)
 
 ```env
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
 ```
+
+Podczas tworzenia konfiguracji dla Telegrama podaj chat ID.
 
 ### Powiadomienia push
 
@@ -66,29 +75,31 @@ Content-Type: application/json
   "orgId": "uuid-organizacji",
   "channel": "SLACK",
   "config": {
-    "channelId": "C01234567"
+    "slackChannel": "#ci-results"
   },
   "events": [
-    "TEST_RUN_COMPLETED",
-    "TEST_RUN_FAILED",
-    "AI_GENERATION_COMPLETED"
+    "run.finished",
+    "run.failed"
   ],
   "enabled": true
 }
 ```
 
+**Pola konfiguracji dla każdego kanału:**
+
+| Kanał | Pole konfiguracji | Przykład |
+|-------|-------------------|---------|
+| Email | `emails` | `{"emails": ["user@example.com"]}` |
+| Slack | `slackChannel` | `{"slackChannel": "#ci-results"}` |
+| Telegram | `chatId` | `{"chatId": "-1001234567890"}` |
+
 ### Zdarzenia
 
 | Zdarzenie | Opis |
 |-----------|------|
-| `TEST_RUN_COMPLETED` | Przebieg testowy zakończony (pomyślnie) |
-| `TEST_RUN_FAILED` | Przebieg testowy zakończony z błędami |
-| `TEST_RUN_ERROR` | Błąd wykonania przebiegu |
-| `PIPELINE_CREATED` | Utworzono nowy pipeline |
-| `AI_GENERATION_COMPLETED` | Generowanie AI zakończone |
-| `MEMBER_INVITED` | Zaproszono nowego członka |
-| `MEMBER_JOINED` | Członek dołączył do organizacji |
-| `COVERAGE_DECREASED` | Pokrycie kodu spadło |
+| `run.finished` | Przebieg testowy zakończony |
+| `run.failed` | Przebieg testowy zakończony z błędami |
+| `membership.requested` | Żądanie członkostwa w organizacji |
 
 ### Zarządzanie konfiguracjami
 
@@ -107,7 +118,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "events": ["TEST_RUN_FAILED"],
+  "events": ["run.failed"],
   "enabled": true
 }
 ```
@@ -119,22 +130,33 @@ DELETE /notifications/configs/:id
 Authorization: Bearer <token>
 ```
 
+### Powiadomienie testowe
+
+Na każdej karcie konfiguracji w Dashboardzie znajduje się przycisk „Wyślij powiadomienie testowe". Wysyła on próbne powiadomienie przez wybrany kanał, aby sprawdzić poprawność konfiguracji.
+
+```http
+POST /notifications/configs/:id/test
+Authorization: Bearer <token>
+```
+
 ## Przez Dashboard
 
 1. Przejdź do organizacji → „Powiadomienia"
 2. Kliknij „Nowa konfiguracja"
 3. Wybierz kanał (Email, Slack, Telegram, Push)
-4. Skonfiguruj parametry kanału
-5. Wybierz zdarzenia do wysyłania
+4. Skonfiguruj parametry kanału:
+   - **Email**: wpisz adresy email odbiorców
+   - **Slack**: wpisz nazwę kanału (np. `#ci-results`)
+   - **Telegram**: wpisz chat ID
+5. Wybierz zdarzenia do subskrypcji (np. `run.finished`, `run.failed`)
 6. Zapisz konfigurację
+7. Użyj przycisku powiadomienia testowego (ikona strzałki) na karcie konfiguracji, aby sprawdzić dostarczanie
 
 ## Architektura
 
-Powiadomienia działają przez szynę zdarzeń (Redpanda):
+Powiadomienia są dostarczane przez bezpośrednie wywołania HTTP między serwisami:
 
-1. Serwis źródłowy publikuje zdarzenie w Redpanda
-2. Notification Service subskrybuje odpowiednie tematy
-3. Po otrzymaniu zdarzenia sprawdzane są aktywne konfiguracje
-4. Powiadomienie jest wysyłane przez skonfigurowane kanały
-
-Zapewnia to asynchroniczne dostarczanie bez wpływu na wydajność głównych serwisów.
+1. Gdy wystąpi odpowiednie zdarzenie (np. zakończenie przebiegu testowego), serwis źródłowy (Pipeline) wysyła żądanie HTTP do wewnętrznego endpointu Notification Service
+2. Notification Service wyszukuje aktywne konfiguracje pasujące do organizacji i typu zdarzenia
+3. Powiadomienia są wysyłane przez wszystkie pasujące skonfigurowane kanały (Email, Slack, Telegram, Push)
+4. Każda próba dostarczenia jest logowana do celów audytu

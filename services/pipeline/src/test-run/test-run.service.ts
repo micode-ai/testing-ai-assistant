@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TestRun, TestRunStatus } from '../../generated/prisma';
 import { TestRunRepository } from './test-run.repository';
@@ -13,6 +14,7 @@ import { toWorkflowCheckType } from './check-type.mapper';
 @Injectable()
 export class TestRunService {
   private readonly logger = new Logger(TestRunService.name);
+  private readonly notificationServiceUrl: string;
 
   constructor(
     private readonly testRunRepository: TestRunRepository,
@@ -20,7 +22,13 @@ export class TestRunService {
     private readonly pipelineService: PipelineService,
     private readonly temporalService: TemporalService,
     private readonly projectClient: ProjectClient,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.notificationServiceUrl = this.configService.get(
+      'NOTIFICATION_SERVICE_URL',
+      'http://localhost:3006',
+    );
+  }
 
   async create(dto: CreateTestRunDto): Promise<TestRun> {
     const run = await this.testRunRepository.create({
@@ -148,7 +156,53 @@ export class TestRunService {
     );
 
     this.logger.log(`Test run completed: ${id} with status ${finalStatus}`);
+
+    // Notify notification service asynchronously
+    this.sendRunNotification(run.pipelineId, id, finalStatus, run.results, durationMs).catch(
+      (err) => this.logger.warn(`Failed to send notification: ${err}`),
+    );
+
     return updated;
+  }
+
+  private async sendRunNotification(
+    pipelineId: string,
+    runId: string,
+    status: string,
+    results: Array<{ status: string }>,
+    durationMs: number,
+  ): Promise<void> {
+    try {
+      const pipeline = await this.pipelineService.findById(pipelineId);
+      if (!pipeline) return;
+
+      const project = await this.projectClient.getProject(pipeline.projectId);
+
+      const passed = results.filter((r) => r.status === 'PASSED').length;
+      const failed = results.filter((r) => r.status === 'FAILED').length;
+      const skipped = results.filter((r) => !['PASSED', 'FAILED'].includes(r.status)).length;
+      const event = status === 'FAILED' ? 'run.failed' : 'run.finished';
+
+      await fetch(`${this.notificationServiceUrl}/api/v1/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: project.orgId,
+          event,
+          data: {
+            runId,
+            runName: pipeline.name,
+            passed,
+            failed,
+            skipped,
+            total: results.length,
+            duration: `${Math.round(durationMs / 1000)}s`,
+          },
+        }),
+      });
+    } catch (error) {
+      this.logger.warn(`Notification service unreachable: ${error}`);
+    }
   }
 
   async error(id: string): Promise<TestRun> {

@@ -543,16 +543,15 @@
     "eventType": "Тип события",
     "eventRunCompleted": "Запуск завершён",
     "eventRunFailed": "Запуск провален",
-    "eventCoverageDrop": "Падение покрытия",
-    "eventPipelineCreated": "Пайплайн создан",
-    "eventPipelineDeleted": "Пайплайн удалён",
+    "eventMembershipRequested": "Запрос на вступление",
     "emailAddresses": "Email адреса",
     "emailPlaceholder": "email1@example.com, email2@example.com",
     "emailHint": "Разделяйте адреса запятыми.",
     "slackChannel": "Slack канал",
     "slackPlaceholder": "#название-канала",
     "telegramChatId": "Telegram Chat ID",
-    "telegramPlaceholder": "123456789"
+    "telegramPlaceholder": "123456789",
+    "testSend": "Отправить тестовое уведомление"
   },
   "auth": {
     "welcomeBack": "С возвращением",

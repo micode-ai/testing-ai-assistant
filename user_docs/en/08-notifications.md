@@ -17,7 +17,7 @@ The Notification Service provides multi-channel notification delivery for system
 
 ### Email (SMTP)
 
-Configure in `.env`:
+Configure in the notification service `.env`:
 
 ```env
 SMTP_HOST=smtp.gmail.com
@@ -27,25 +27,34 @@ SMTP_PASS=your-app-password
 SMTP_FROM=noreply@yourdomain.com
 ```
 
+> **Tip:** For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833) instead of your regular password.
+
 ### Slack
 
 1. Create a Slack app at https://api.slack.com/apps
-2. Add Bot Token Scopes: `chat:write`, `channels:read`
+2. Add Bot Token Scopes: `chat:write`
 3. Install the app to your workspace
-4. Copy the Bot Token
+4. Copy the Bot Token (starts with `xoxb-`)
+5. Invite the bot to the desired channel (`/invite @YourBotName`)
 
 ```env
 SLACK_BOT_TOKEN=xoxb-your-token
 ```
 
+When creating a notification config for Slack, specify the channel name (e.g., `#ci-results`).
+
 ### Telegram
 
 1. Create a bot via @BotFather in Telegram
 2. Get the bot token
+3. Add the bot to your group/channel
+4. Get the chat ID (you can use `https://api.telegram.org/bot<TOKEN>/getUpdates` after sending a message to the bot)
 
 ```env
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
 ```
+
+When creating a notification config for Telegram, specify the chat ID.
 
 ### Push Notifications
 
@@ -66,29 +75,31 @@ Content-Type: application/json
   "orgId": "org-uuid",
   "channel": "SLACK",
   "config": {
-    "channelId": "C01234567"
+    "slackChannel": "#ci-results"
   },
   "events": [
-    "TEST_RUN_COMPLETED",
-    "TEST_RUN_FAILED",
-    "AI_GENERATION_COMPLETED"
+    "run.finished",
+    "run.failed"
   ],
   "enabled": true
 }
 ```
 
+**Channel-specific config fields:**
+
+| Channel | Config field | Example |
+|---------|-------------|---------|
+| Email | `emails` | `{"emails": ["user@example.com"]}` |
+| Slack | `slackChannel` | `{"slackChannel": "#ci-results"}` |
+| Telegram | `chatId` | `{"chatId": "-1001234567890"}` |
+
 ### Events
 
 | Event | Description |
 |-------|-------------|
-| `TEST_RUN_COMPLETED` | Test run completed (successfully) |
-| `TEST_RUN_FAILED` | Test run completed with failures |
-| `TEST_RUN_ERROR` | Run execution error |
-| `PIPELINE_CREATED` | New pipeline created |
-| `AI_GENERATION_COMPLETED` | AI generation completed |
-| `MEMBER_INVITED` | New member invited |
-| `MEMBER_JOINED` | Member joined organization |
-| `COVERAGE_DECREASED` | Code coverage decreased |
+| `run.finished` | Test run completed |
+| `run.failed` | Test run failed |
+| `membership.requested` | Membership requested |
 
 ### Managing Configurations
 
@@ -107,7 +118,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "events": ["TEST_RUN_FAILED"],
+  "events": ["run.failed"],
   "enabled": true
 }
 ```
@@ -119,22 +130,33 @@ DELETE /notifications/configs/:id
 Authorization: Bearer <token>
 ```
 
+### Test Notification
+
+Each notification config has a "Send test notification" button on the config card in the Dashboard. This sends a sample notification through the specific channel to verify that the configuration is working correctly.
+
+```http
+POST /notifications/configs/:id/test
+Authorization: Bearer <token>
+```
+
 ## Via Dashboard
 
 1. Navigate to organization → "Notifications"
 2. Click "New Configuration"
 3. Select channel (Email, Slack, Telegram, Push)
-4. Configure channel parameters
-5. Select events to send
+4. Configure channel parameters:
+   - **Email**: enter recipient email addresses
+   - **Slack**: enter channel name (e.g., `#ci-results`)
+   - **Telegram**: enter chat ID
+5. Select events to subscribe to (e.g., `run.finished`, `run.failed`)
 6. Save the configuration
+7. Use the test notification button (arrow icon) on the config card to verify delivery
 
 ## Architecture
 
-Notifications work through the event bus (Redpanda):
+Notifications are delivered via direct HTTP calls between services:
 
-1. The source service publishes an event to Redpanda
-2. Notification Service subscribes to relevant topics
-3. Upon receiving an event, active configurations are checked
-4. Notifications are sent through configured channels
-
-This ensures asynchronous delivery without affecting core service performance.
+1. When a relevant event occurs (e.g., a test run completes), the source service (Pipeline) sends an HTTP request to the Notification Service internal endpoint
+2. The Notification Service looks up active configurations matching the organization and event type
+3. Notifications are sent through all matching configured channels (Email, Slack, Telegram, Push)
+4. Each delivery attempt is logged for auditability

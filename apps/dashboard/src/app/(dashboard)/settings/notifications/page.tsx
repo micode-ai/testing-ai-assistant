@@ -3,12 +3,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
-import { Bell, Plus, Trash2, Mail, MessageSquare, Send } from 'lucide-react';
+import { Bell, Plus, Trash2, Mail, MessageSquare, Send, AlertCircle, SendHorizonal } from 'lucide-react';
+import { useOrgStore } from '@/lib/stores/org-store';
 import {
   getNotificationConfigs,
   createNotificationConfig,
   updateNotificationConfig,
   deleteNotificationConfig,
+  testNotificationConfig,
 } from '@/lib/api/notifications';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,11 +33,9 @@ import {
 import type { NotificationConfig, NotificationChannel } from '@/types';
 
 const EVENT_TYPES = [
-  'RUN_COMPLETED',
-  'RUN_FAILED',
-  'COVERAGE_DROP',
-  'PIPELINE_CREATED',
-  'PIPELINE_DELETED',
+  'run.finished',
+  'run.failed',
+  'membership.requested',
 ];
 
 export default function NotificationsSettingsPage() {
@@ -45,6 +45,7 @@ export default function NotificationsSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const CHANNEL_OPTIONS: { value: NotificationChannel; label: string; icon: typeof Mail }[] = [
     { value: 'EMAIL', label: t('notificationSettings.channelEmail'), icon: Mail },
@@ -53,16 +54,34 @@ export default function NotificationsSettingsPage() {
   ];
 
   const EVENT_TYPE_LABELS: Record<string, string> = {
-    RUN_COMPLETED: t('notificationSettings.eventRunCompleted'),
-    RUN_FAILED: t('notificationSettings.eventRunFailed'),
-    COVERAGE_DROP: t('notificationSettings.eventCoverageDrop'),
-    PIPELINE_CREATED: t('notificationSettings.eventPipelineCreated'),
-    PIPELINE_DELETED: t('notificationSettings.eventPipelineDeleted'),
+    'run.finished': t('notificationSettings.eventRunCompleted'),
+    'run.failed': t('notificationSettings.eventRunFailed'),
+    'membership.requested': t('notificationSettings.eventMembershipRequested'),
   };
 
   function getChannelIcon(channel: NotificationChannel) {
     const option = CHANNEL_OPTIONS.find((o) => o.value === channel);
     return option?.icon ?? Bell;
+  }
+
+  function getChannelLabel(channel: NotificationChannel) {
+    const option = CHANNEL_OPTIONS.find((o) => o.value === channel);
+    return option?.label ?? channel;
+  }
+
+  function formatConfigDetails(channel: NotificationChannel, config: Record<string, unknown>): string {
+    switch (channel) {
+      case 'EMAIL': {
+        const emails = Array.isArray(config.emails) ? config.emails : [];
+        return emails.join(', ');
+      }
+      case 'SLACK':
+        return config.slackChannel ? String(config.slackChannel) : config.channel ? String(config.channel) : '';
+      case 'TELEGRAM':
+        return config.chatId ? `Chat ID: ${config.chatId}` : '';
+      default:
+        return JSON.stringify(config);
+    }
   }
 
   // Form state
@@ -73,7 +92,7 @@ export default function NotificationsSettingsPage() {
   const [configTelegramChatId, setConfigTelegramChatId] = useState('');
 
   const token = (session as unknown as Record<string, unknown>)?.accessToken as string;
-  const orgId = (session as unknown as Record<string, unknown>)?.orgId as string;
+  const { currentOrgId: orgId } = useOrgStore();
 
   const fetchConfigs = useCallback(async () => {
     if (!token || !orgId) {
@@ -99,7 +118,7 @@ export default function NotificationsSettingsPage() {
       case 'EMAIL':
         return { emails: configEmail.split(',').map((e) => e.trim()).filter(Boolean) };
       case 'SLACK':
-        return { channel: configSlackChannel };
+        return { slackChannel: configSlackChannel };
       case 'TELEGRAM':
         return { chatId: configTelegramChatId };
     }
@@ -108,6 +127,7 @@ export default function NotificationsSettingsPage() {
   async function onCreateConfig() {
     if (!token || !orgId) return;
     setIsSubmitting(true);
+    setError(null);
     try {
       const newConfig = await createNotificationConfig(
         {
@@ -122,8 +142,8 @@ export default function NotificationsSettingsPage() {
       setConfigs((prev) => [...prev, newConfig]);
       setIsDialogOpen(false);
       resetForm();
-    } catch {
-      // Silently fail
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create config');
     } finally {
       setIsSubmitting(false);
     }
@@ -146,6 +166,15 @@ export default function NotificationsSettingsPage() {
       setConfigs((prev) => prev.filter((c) => c.id !== id));
     } catch {
       // Silently fail
+    }
+  }
+
+  async function onTestConfig(id: string) {
+    if (!token) return;
+    try {
+      await testNotificationConfig(id, token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Test notification failed');
     }
   }
 
@@ -215,7 +244,7 @@ export default function NotificationsSettingsPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <ChannelIcon className="h-4 w-4 text-muted-foreground" />
-                            <CardTitle className="text-base">{config.channel}</CardTitle>
+                            <CardTitle className="text-base">{getChannelLabel(config.channel)}</CardTitle>
                           </div>
                           <div className="flex items-center gap-2">
                             <button
@@ -233,6 +262,14 @@ export default function NotificationsSettingsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => onTestConfig(config.id)}
+                              title={t('notificationSettings.testSend')}
+                            >
+                              <SendHorizonal className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => onDeleteConfig(config.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -240,7 +277,7 @@ export default function NotificationsSettingsPage() {
                           </div>
                         </div>
                         <CardDescription className="text-xs">
-                          {JSON.stringify(config.config)}
+                          {formatConfigDetails(config.channel, config.config as Record<string, unknown>)}
                         </CardDescription>
                       </CardHeader>
                     </Card>
@@ -324,8 +361,14 @@ export default function NotificationsSettingsPage() {
               </div>
             )}
           </div>
+          {error && (
+            <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button variant="outline" onClick={() => { setIsDialogOpen(false); setError(null); }}>
               {t('common.cancel')}
             </Button>
             <Button onClick={onCreateConfig} disabled={isSubmitting}>

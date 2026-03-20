@@ -43,14 +43,14 @@ async function notificationClient<T>(path: string, options: RequestInit & { toke
 }
 
 export async function getNotificationConfigs(orgId: string, token?: string): Promise<NotificationConfig[]> {
-  return notificationClient<NotificationConfig[]>(`/configs?orgId=${orgId}`, { token });
+  return notificationClient<NotificationConfig[]>(`/notifications/configs?orgId=${orgId}`, { token });
 }
 
 export async function createNotificationConfig(
   data: { orgId: string; channel: string; event: string; config: Record<string, unknown>; enabled: boolean },
   token?: string,
 ): Promise<NotificationConfig> {
-  return notificationClient<NotificationConfig>('/configs', {
+  return notificationClient<NotificationConfig>('/notifications/configs', {
     method: 'POST',
     body: JSON.stringify(data),
     token,
@@ -62,7 +62,7 @@ export async function updateNotificationConfig(
   data: Partial<{ channel: string; event: string; config: Record<string, unknown>; enabled: boolean }>,
   token?: string,
 ): Promise<NotificationConfig> {
-  return notificationClient<NotificationConfig>(`/configs/${id}`, {
+  return notificationClient<NotificationConfig>(`/notifications/configs/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
     token,
@@ -70,5 +70,9 @@ export async function updateNotificationConfig(
 }
 
 export async function deleteNotificationConfig(id: string, token?: string): Promise<void> {
-  return notificationClient<void>(`/configs/${id}`, { method: 'DELETE', token });
+  return notificationClient<void>(`/notifications/configs/${id}`, { method: 'DELETE', token });
+}
+
+export async function testNotificationConfig(id: string, token?: string): Promise<void> {
+  return notificationClient<void>(`/notifications/configs/${id}/test`, { method: 'POST', token });
 }

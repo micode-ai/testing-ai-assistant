@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 export interface ProjectInfo {
   id: string;
+  orgId: string;
   repoUrl: string;
   repoProvider: string;
   defaultBranch: string;

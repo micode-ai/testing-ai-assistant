@@ -543,16 +543,15 @@
     "eventType": "Event Type",
     "eventRunCompleted": "Run Completed",
     "eventRunFailed": "Run Failed",
-    "eventCoverageDrop": "Coverage Drop",
-    "eventPipelineCreated": "Pipeline Created",
-    "eventPipelineDeleted": "Pipeline Deleted",
+    "eventMembershipRequested": "Membership Request",
     "emailAddresses": "Email Addresses",
     "emailPlaceholder": "email1@example.com, email2@example.com",
     "emailHint": "Separate multiple addresses with commas.",
     "slackChannel": "Slack Channel",
     "slackPlaceholder": "#channel-name",
     "telegramChatId": "Telegram Chat ID",
-    "telegramPlaceholder": "123456789"
+    "telegramPlaceholder": "123456789",
+    "testSend": "Send test notification"
   },
   "auth": {
     "welcomeBack": "Welcome back",

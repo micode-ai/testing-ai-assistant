@@ -17,7 +17,7 @@ Notification Service обеспечивает мультиканальную о�
 
 ### Email (SMTP)
 
-Настройте в `.env`:
+Настройте в `.env` сервиса уведомлений:
 
 ```env
 SMTP_HOST=smtp.gmail.com
@@ -27,25 +27,34 @@ SMTP_PASS=your-app-password
 SMTP_FROM=noreply@yourdomain.com
 ```
 
+> **Совет:** Для Gmail используйте [пароль приложения](https://support.google.com/accounts/answer/185833) вместо обычного пароля.
+
 ### Slack
 
 1. Создайте Slack-приложение на https://api.slack.com/apps
-2. Добавьте Bot Token Scopes: `chat:write`, `channels:read`
+2. Добавьте Bot Token Scopes: `chat:write`
 3. Установите приложение в workspace
-4. Скопируйте Bot Token
+4. Скопируйте Bot Token (начинается с `xoxb-`)
+5. Пригласите бота в нужный канал (`/invite @ИмяБота`)
 
 ```env
 SLACK_BOT_TOKEN=xoxb-your-token
 ```
 
+При создании конфигурации для Slack укажите имя канала (например, `#ci-results`).
+
 ### Telegram
 
 1. Создайте бота через @BotFather в Telegram
 2. Получите токен бота
+3. Добавьте бота в группу/канал
+4. Получите chat ID (можно через `https://api.telegram.org/bot<TOKEN>/getUpdates` после отправки сообщения боту)
 
 ```env
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
 ```
+
+При создании конфигурации для Telegram укажите chat ID.
 
 ### Push-уведомления
 
@@ -66,29 +75,31 @@ Content-Type: application/json
   "orgId": "uuid-организации",
   "channel": "SLACK",
   "config": {
-    "channelId": "C01234567"
+    "slackChannel": "#ci-results"
   },
   "events": [
-    "TEST_RUN_COMPLETED",
-    "TEST_RUN_FAILED",
-    "AI_GENERATION_COMPLETED"
+    "run.finished",
+    "run.failed"
   ],
   "enabled": true
 }
 ```
 
+**Поля конфигурации для каждого канала:**
+
+| Канал | Поле конфигурации | Пример |
+|-------|-------------------|--------|
+| Email | `emails` | `{"emails": ["user@example.com"]}` |
+| Slack | `slackChannel` | `{"slackChannel": "#ci-results"}` |
+| Telegram | `chatId` | `{"chatId": "-1001234567890"}` |
+
 ### События
 
 | Событие | Описание |
 |---------|----------|
-| `TEST_RUN_COMPLETED` | Тестовый прогон завершён (успешно) |
-| `TEST_RUN_FAILED` | Тестовый прогон завершён с ошибками |
-| `TEST_RUN_ERROR` | Ошибка выполнения прогона |
-| `PIPELINE_CREATED` | Создан новый пайплайн |
-| `AI_GENERATION_COMPLETED` | AI-генерация завершена |
-| `MEMBER_INVITED` | Приглашён новый участник |
-| `MEMBER_JOINED` | Участник вступил в организацию |
-| `COVERAGE_DECREASED` | Покрытие кода снизилось |
+| `run.finished` | Тестовый прогон завершён |
+| `run.failed` | Тестовый прогон завершён с ошибками |
+| `membership.requested` | Запрос на членство в организации |
 
 ### Управление конфигурациями
 
@@ -107,7 +118,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "events": ["TEST_RUN_FAILED"],
+  "events": ["run.failed"],
   "enabled": true
 }
 ```
@@ -119,22 +130,33 @@ DELETE /notifications/configs/:id
 Authorization: Bearer <token>
 ```
 
+### Тестовое уведомление
+
+На каждой карточке конфигурации в Dashboard есть кнопка «Отправить тестовое уведомление». Она отправляет пробное уведомление через указанный канал, чтобы проверить корректность настройки.
+
+```http
+POST /notifications/configs/:id/test
+Authorization: Bearer <token>
+```
+
 ## Через Dashboard
 
 1. Перейдите в организацию → «Уведомления»
 2. Нажмите «Новая конфигурация»
 3. Выберите канал (Email, Slack, Telegram, Push)
-4. Настройте параметры канала
-5. Выберите события для отправки
+4. Настройте параметры канала:
+   - **Email**: введите адреса электронной почты получателей
+   - **Slack**: введите имя канала (например, `#ci-results`)
+   - **Telegram**: введите chat ID
+5. Выберите события для подписки (например, `run.finished`, `run.failed`)
 6. Сохраните конфигурацию
+7. Используйте кнопку тестового уведомления (иконка стрелки) на карточке конфигурации для проверки доставки
 
 ## Архитектура
 
-Уведомления работают через событийную шину (Redpanda):
+Уведомления доставляются через прямые HTTP-вызовы между сервисами:
 
-1. Сервис-источник публикует событие в Redpanda
-2. Notification Service подписан на соответствующие топики
-3. При получении события проверяются активные конфигурации
-4. Уведомление отправляется через настроенные каналы
-
-Это обеспечивает асинхронную доставку без влияния на производительность основных сервисов.
+1. При наступлении события (например, завершение тестового прогона) сервис-источник (Pipeline) отправляет HTTP-запрос на внутренний эндпоинт Notification Service
+2. Notification Service ищет активные конфигурации, соответствующие организации и типу события
+3. Уведомления отправляются через все подходящие настроенные каналы (Email, Slack, Telegram, Push)
+4. Каждая попытка доставки логируется для аудита
